@@ -1,0 +1,18 @@
+:root {
+  --color-indigo-deep: #2b2456;
+  --color-indigo-primary: #4c4099;
+  --color-indigo-light: #edebf7;
+  --color-amber: #d99a2b;
+
+  --color-background: #faf9f6;
+  --color-surface: #ffffff;
+  --color-border: #e5e3dc;
+  --color-text-secondary: #6b6a64;
+
+  --color-status-scheduled-bg: #fbf1df;
+  --color-status-scheduled-text: #6b4a0a;
+  --color-status-sent-bg: #e1f5ee;
+  --color-status-sent-text: #0f6e56;
+  --color-status-failed-bg: #fcebeb;
+  --color-status-failed-text: #a32d2d;
+}
