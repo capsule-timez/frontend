@@ -92,8 +92,25 @@ cp .env.example .env
 | Variável | Descrição | Valor local |
 |---|---|---|
 | `VITE_API_URL` | Endereço base da API | `http://localhost:3000` |
+| `VITE_MOCK_ACCESS_TOKEN` | JWT usado pelo login mockado | gerado conforme abaixo |
 
 A URL da API nunca deve ser fixada no código. Toda chamada passa pelo cliente HTTP configurado a partir desta variável.
+
+### Login mockado
+
+Enquanto o fluxo real de login não está pronto, a sessão é fixa no usuário de teste do backend (`teste@capsuletimez.com`), definida em `src/contexts/AuthContext.tsx`. As chamadas à API usam o token informado em `VITE_MOCK_ACCESS_TOKEN`.
+
+Para gerar o token, com a API rodando e o usuário de teste criado (`npx tsx scripts/createTestUser.ts` no `backend`):
+
+```bash
+curl -X POST http://localhost:3000/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"teste@capsuletimez.com","password":"senha123"}'
+```
+
+Copie o campo `token` da resposta para `VITE_MOCK_ACCESS_TOKEN` e reinicie o `npm run dev`. O token expira conforme o `JWT_EXPIRES_IN` da API (1 hora por padrão); quando expirar, gere outro.
+
+Enquanto `GET /api/capsules` não existir na API, a listagem exibe as cápsulas criadas por este navegador, guardadas em `localStorage` (fallback em `src/services/capsuleService.ts`).
 
 ### Execução
 
