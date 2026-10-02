@@ -1,0 +1,78 @@
+.nova-capsula {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.nova-capsula__header h1 {
+  margin-bottom: 0.25rem;
+}
+
+.nova-capsula__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  margin-top: 1.5rem;
+}
+
+.nova-capsula__label-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.nova-capsula__textarea {
+  resize: vertical;
+  min-height: 10rem;
+}
+
+/* O agendamento é o que diferencia o produto: recebe destaque maior. */
+.nova-capsula__schedule {
+  margin: 0;
+  padding: 1.25rem;
+  border: 2px solid var(--color-amber);
+  border-radius: 12px;
+  background-color: var(--color-indigo-light);
+}
+
+.nova-capsula__schedule-title {
+  padding: 0 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.nova-capsula__recipient {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.nova-capsula__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.nova-capsula__option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background-color: var(--color-surface);
+  cursor: pointer;
+}
+
+.nova-capsula__option:has(input:checked) {
+  border-color: var(--color-indigo-primary);
+  background-color: var(--color-indigo-light);
+}
+
+.nova-capsula__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
