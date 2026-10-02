@@ -39,3 +39,10 @@
   flex: 1;
   padding: 2rem 1.5rem;
 }
+
+.layout__user {
+  padding-left: 1.25rem;
+  border-left: 1px solid var(--color-indigo-light);
+  color: var(--color-indigo-light);
+  font-size: 0.9rem;
+}
