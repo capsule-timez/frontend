@@ -143,6 +143,25 @@ A API emite um token JWT no login. Esse token é armazenado no navegador e envia
 
 Rotas autenticadas redirecionam para o login quando não há sessão válida. A sessão persiste entre recarregamentos da página.
 
+### Como funciona
+
+- `contexts/AuthProvider` mantém a sessão (token + usuário) e expõe `login`, `register` e `logout` pelo hook `useAuth`.
+- A sessão é gravada no `localStorage` (chave `capsula:auth`) por `services/authStorage` e lida de forma síncrona na inicialização, para que o recarregamento não derrube o usuário.
+- `routes/ProtectedRoute` protege as rotas autenticadas; `routes/PublicOnlyRoute` leva quem já tem sessão de `/login` e `/cadastro` para `/capsulas`, o que também faz o redirecionamento logo após autenticar.
+- `services/httpClient` envia `Authorization: Bearer <token>` quando há sessão. Se a API responder `401` a uma requisição que levava token (expirado ou inválido), a sessão local é encerrada e o usuário volta ao login. Um `401` no próprio login (credenciais inválidas) não encerra nada.
+- O cadastro cria a conta e em seguida faz o login com as mesmas credenciais, já que a API não emite token no cadastro.
+
+### Contrato assumido com a API
+
+Todas as chamadas ficam em `services/authService.ts`; se o contrato mudar, é o único lugar a ajustar.
+
+| Endpoint | Envia | Sucesso | Erros tratados |
+|---|---|---|---|
+| `POST /api/auth/register` | `{ name, email, password }` | `2xx` (o corpo não é usado) | `400` com `details: [{ field, message }]`, `409` e-mail já cadastrado |
+| `POST /api/auth/login` | `{ email, password }` | `{ token, user: { id, name, email } }` | `401` credenciais inválidas |
+
+Erros seguem o formato da API, `{ status: 'error', message, details? }`: a `message` aparece no topo do formulário e os itens de `details` aparecem junto do campo correspondente. Falhas de rede mostram uma mensagem própria.
+
 ---
 
 ## Design
