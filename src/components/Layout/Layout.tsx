@@ -3,7 +3,7 @@ import { useAuth } from '../../contexts/AuthContext'
 import './Layout.css'
 
 export function Layout() {
-  const { isAuthenticated, user } = useAuth()
+  const { isAuthenticated, user, logout } = useAuth()
 
   return (
     <div className="layout">
@@ -19,6 +19,9 @@ export function Layout() {
                 Nova cápsula
               </NavLink>
               <span className="layout__user">{user?.name}</span>
+              <button type="button" className="layout__link layout__logout" onClick={logout}>
+                Sair
+              </button>
             </>
           ) : (
             <>

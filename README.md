@@ -92,23 +92,8 @@ cp .env.example .env
 | Variável | Descrição | Valor local |
 |---|---|---|
 | `VITE_API_URL` | Endereço base da API | `http://localhost:3000` |
-| `VITE_MOCK_ACCESS_TOKEN` | JWT usado pelo login mockado | gerado conforme abaixo |
 
 A URL da API nunca deve ser fixada no código. Toda chamada passa pelo cliente HTTP configurado a partir desta variável.
-
-### Login mockado
-
-Enquanto o fluxo real de login não está pronto, a sessão é fixa no usuário de teste do backend (`teste@capsuletimez.com`), definida em `src/contexts/AuthContext.tsx`. As chamadas à API usam o token informado em `VITE_MOCK_ACCESS_TOKEN`.
-
-Para gerar o token, com a API rodando e o usuário de teste criado (`npx tsx scripts/createTestUser.ts` no `backend`):
-
-```bash
-curl -X POST http://localhost:3000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"teste@capsuletimez.com","password":"senha123"}'
-```
-
-Copie o campo `token` da resposta para `VITE_MOCK_ACCESS_TOKEN` e reinicie o `npm run dev`. O token expira conforme o `JWT_EXPIRES_IN` da API (1 hora por padrão); quando expirar, gere outro.
 
 Enquanto `GET /api/capsules` não existir na API, a listagem exibe as cápsulas criadas por este navegador, guardadas em `localStorage` (fallback em `src/services/capsuleService.ts`).
 
@@ -159,6 +144,25 @@ A rota `/c/:token` é a única rota pública que exibe conteúdo. Ela existe por
 A API emite um token JWT no login. Esse token é armazenado no navegador e enviado no cabeçalho de autorização em todas as requisições a rotas protegidas.
 
 Rotas autenticadas redirecionam para o login quando não há sessão válida. A sessão persiste entre recarregamentos da página.
+
+### Como funciona
+
+- `contexts/AuthContext` (`AuthProvider` e hook `useAuth`) mantém a sessão (token + usuário) e expõe `login`, `register` e `logout` pelo hook `useAuth`.
+- A sessão é gravada no `localStorage` (chave `capsula:auth`) por `services/authStorage` e lida de forma síncrona na inicialização, para que o recarregamento não derrube o usuário.
+- `routes/ProtectedRoute` protege as rotas autenticadas; `routes/PublicOnlyRoute` leva quem já tem sessão de `/login` e `/cadastro` para `/capsulas`, o que também faz o redirecionamento logo após autenticar.
+- `services/httpClient` envia `Authorization: Bearer <token>` quando há sessão. Se a API responder `401` a uma requisição que levava token (expirado ou inválido), a sessão local é encerrada e o usuário volta ao login. Um `401` no próprio login (credenciais inválidas) não encerra nada.
+- O cadastro cria a conta e em seguida faz o login com as mesmas credenciais, já que a API não emite token no cadastro.
+
+### Contrato assumido com a API
+
+Todas as chamadas ficam em `services/authService.ts`; se o contrato mudar, é o único lugar a ajustar.
+
+| Endpoint | Envia | Sucesso | Erros tratados |
+|---|---|---|---|
+| `POST /api/auth/register` | `{ name, email, password }` | `2xx` (o corpo não é usado) | `400` com `details: [{ field, message }]`, `409` e-mail já cadastrado |
+| `POST /api/auth/login` | `{ email, password }` | `{ token, user: { id, name, email } }` | `401` credenciais inválidas |
+
+Erros seguem o formato da API, `{ status: 'error', message, details? }`: a `message` aparece no topo do formulário e os itens de `details` aparecem junto do campo correspondente. Falhas de rede mostram uma mensagem própria.
 
 ---
 

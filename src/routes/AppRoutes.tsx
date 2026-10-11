@@ -5,14 +5,17 @@ import { CapsulasPage } from '../pages/CapsulasPage'
 import { LoginPage } from '../pages/LoginPage'
 import { NovaCapsulaPage } from '../pages/NovaCapsulaPage'
 import { ProtectedRoute } from './ProtectedRoute'
+import { PublicOnlyRoute } from './PublicOnlyRoute'
 
 export function AppRoutes() {
   return (
     <Routes>
       <Route element={<Layout />}>
         <Route index element={<Navigate to="/capsulas" replace />} />
-        <Route path="login" element={<LoginPage />} />
-        <Route path="cadastro" element={<CadastroPage />} />
+        <Route element={<PublicOnlyRoute />}>
+          <Route path="login" element={<LoginPage />} />
+          <Route path="cadastro" element={<CadastroPage />} />
+        </Route>
         <Route element={<ProtectedRoute />}>
           <Route path="capsulas" element={<CapsulasPage />} />
           <Route path="capsulas/nova" element={<NovaCapsulaPage />} />

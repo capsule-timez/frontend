@@ -105,7 +105,7 @@ export function NovaCapsulaPage() {
         focusFirstError(apiErrors)
         setFormError('Revise os campos destacados.')
       } else if (details.code === 'UNAUTHORIZED' || details.code === 'TOKEN_EXPIRED') {
-        setFormError('Sessão mockada inválida ou expirada. Verifique VITE_MOCK_ACCESS_TOKEN.')
+        setFormError('Sessão inválida ou expirada. Faça login novamente.')
       } else {
         setFormError(details.message)
       }

@@ -22,3 +22,27 @@ httpClient.interceptors.request.use((config) => {
 
   return config
 })
+
+let unauthorizedHandler: (() => void) | null = null
+
+/**
+ * Registra o que fazer quando a API rejeita um token enviado (expirado ou
+ * inválido). Usado pelo AuthProvider para encerrar a sessão local.
+ */
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler
+}
+
+httpClient.interceptors.response.use(undefined, (error: unknown) => {
+  // Só conta como sessão rejeitada se a requisição levava um token. Um 401 no
+  // login (credenciais inválidas) não deve derrubar nada.
+  if (
+    axios.isAxiosError(error) &&
+    error.response?.status === 401 &&
+    error.config?.headers.get('Authorization')
+  ) {
+    unauthorizedHandler?.()
+  }
+
+  return Promise.reject(error)
+})
