@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
-import { useAuth } from '../../hooks/useAuth'
+import { useAuth } from '../../contexts/AuthContext'
 import './Layout.css'
 
 export function Layout() {
@@ -12,6 +12,12 @@ export function Layout() {
         <nav className="layout__nav">
           {isAuthenticated ? (
             <>
+              <NavLink to="/capsulas" end className="layout__link">
+                Minhas cápsulas
+              </NavLink>
+              <NavLink to="/capsulas/nova" className="layout__link">
+                Nova cápsula
+              </NavLink>
               <span className="layout__user">{user?.name}</span>
               <button type="button" className="layout__link layout__logout" onClick={logout}>
                 Sair

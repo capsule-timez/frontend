@@ -95,6 +95,8 @@ cp .env.example .env
 
 A URL da API nunca deve ser fixada no código. Toda chamada passa pelo cliente HTTP configurado a partir desta variável.
 
+Enquanto `GET /api/capsules` não existir na API, a listagem exibe as cápsulas criadas por este navegador, guardadas em `localStorage` (fallback em `src/services/capsuleService.ts`).
+
 ### Execução
 
 ```bash
@@ -145,7 +147,7 @@ Rotas autenticadas redirecionam para o login quando não há sessão válida. A 
 
 ### Como funciona
 
-- `contexts/AuthProvider` mantém a sessão (token + usuário) e expõe `login`, `register` e `logout` pelo hook `useAuth`.
+- `contexts/AuthContext` (`AuthProvider` e hook `useAuth`) mantém a sessão (token + usuário) e expõe `login`, `register` e `logout` pelo hook `useAuth`.
 - A sessão é gravada no `localStorage` (chave `capsula:auth`) por `services/authStorage` e lida de forma síncrona na inicialização, para que o recarregamento não derrube o usuário.
 - `routes/ProtectedRoute` protege as rotas autenticadas; `routes/PublicOnlyRoute` leva quem já tem sessão de `/login` e `/cadastro` para `/capsulas`, o que também faz o redirecionamento logo após autenticar.
 - `services/httpClient` envia `Authorization: Bearer <token>` quando há sessão. Se a API responder `401` a uma requisição que levava token (expirado ou inválido), a sessão local é encerrada e o usuário volta ao login. Um `401` no próprio login (credenciais inválidas) não encerra nada.

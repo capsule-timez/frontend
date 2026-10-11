@@ -3,7 +3,7 @@ import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AuthCard } from '../components/AuthCard/AuthCard'
 import { FormField } from '../components/FormField/FormField'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../contexts/AuthContext'
 import { getApiError } from '../services/apiError'
 import type { ApiError } from '../services/apiError'
 

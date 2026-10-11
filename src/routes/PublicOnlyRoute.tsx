@@ -1,5 +1,5 @@
 import { Navigate, Outlet } from 'react-router-dom'
-import { useAuth } from '../hooks/useAuth'
+import { useAuth } from '../contexts/AuthContext'
 
 /**
  * Rotas de login e cadastro. Com sessão ativa, leva o usuário à listagem de
