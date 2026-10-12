@@ -95,7 +95,7 @@ cp .env.example .env
 
 A URL da API nunca deve ser fixada no código. Toda chamada passa pelo cliente HTTP configurado a partir desta variável.
 
-Enquanto `GET /api/capsules` não existir na API, a listagem exibe as cápsulas criadas por este navegador, guardadas em `localStorage` (fallback em `src/services/capsuleService.ts`).
+A listagem consome `GET /api/capsules` (cápsulas do usuário autenticado, ordenadas pela data de entrega), em `src/services/capsuleService.ts`.
 
 ### Execução
 
