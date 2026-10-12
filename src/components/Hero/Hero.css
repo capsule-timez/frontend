@@ -1,0 +1,148 @@
+.hero {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.5rem 2rem;
+  padding: 2rem;
+  overflow: hidden;
+  border: var(--stroke);
+  background-color: var(--color-orange);
+  box-shadow: var(--shadow-3);
+}
+
+.hero__decoration {
+  position: absolute;
+  top: 1.5rem;
+  right: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 8.5rem;
+  height: 8.5rem;
+  border: var(--stroke);
+  border-radius: 50%;
+  background-color: var(--color-yellow);
+  box-shadow: var(--shadow-2);
+  animation: hero-flip 6s var(--ease-spring) infinite;
+  pointer-events: none;
+}
+
+.hero__main {
+  position: relative;
+  flex: 1 1 22rem;
+  max-width: 34rem;
+}
+
+.hero__eyebrow {
+  display: inline-block;
+  margin: 0 0 0.75rem;
+  padding: 0.2rem 0.6rem;
+  background-color: var(--color-ink);
+  color: var(--color-yellow);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.hero__title {
+  margin: 0;
+  font-size: clamp(1.75rem, 4.5vw, 2.6rem);
+  line-height: 1.05;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.hero__description {
+  margin: 0.75rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 500;
+}
+
+.hero__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+}
+
+.hero__stats {
+  position: relative;
+  display: flex;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.hero__stat {
+  display: flex;
+  flex-direction: column-reverse;
+  min-width: 5.5rem;
+  padding: 0.75rem 1rem;
+  border: var(--stroke);
+  background-color: var(--color-ink);
+  box-shadow: 4px 4px 0 0 var(--color-surface);
+  color: var(--color-surface);
+}
+
+.hero__stat-value {
+  margin: 0;
+  color: var(--color-yellow);
+  font-family: var(--font-display);
+  font-size: 2.1rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.hero__stat-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@keyframes hero-flip {
+  0%,
+  60% {
+    transform: rotate(0deg);
+  }
+  80%,
+  100% {
+    transform: rotate(180deg);
+  }
+}
+
+@media (max-width: 52rem) {
+  .hero__decoration {
+    top: 1rem;
+    right: 1rem;
+    width: 5rem;
+    height: 5rem;
+    box-shadow: var(--shadow-1);
+  }
+
+  .hero__decoration svg {
+    width: 2.75rem;
+    height: 2.75rem;
+  }
+
+  .hero__main {
+    padding-top: 4.5rem;
+  }
+}
+
+@media (max-width: 40rem) {
+  .hero {
+    padding: 1.25rem;
+  }
+
+  .hero__stats {
+    width: 100%;
+  }
+
+  .hero__stat {
+    flex: 1;
+    min-width: 0;
+  }
+}
