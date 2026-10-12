@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
+import { useToast } from './ToastContext'
 import { authService } from '../services/authService'
 import { authStorage } from '../services/authStorage'
 import { setAuthTokenGetter, setUnauthorizedHandler } from '../services/httpClient'
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Leitura síncrona do storage no primeiro render: evita um instante "sem
   // sessão" que redirecionaria o usuário ao login ao recarregar a página.
   const [session, setSession] = useState<AuthSession | null>(() => authStorage.load())
+  const toast = useToast()
 
   const logout = useCallback(() => {
     authStorage.clear()
@@ -44,9 +46,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   )
 
   useEffect(() => {
-    setUnauthorizedHandler(logout)
+    // A API rejeitou o token: encerra a sessão e explica por que o usuário voltou ao login.
+    setUnauthorizedHandler(() => {
+      logout()
+      toast.info('Sua sessão expirou', { description: 'Entre novamente para continuar.' })
+    })
     return () => setUnauthorizedHandler(null)
-  }, [logout])
+  }, [logout, toast])
 
   const value = useMemo<AuthContextValue>(
     () => ({
