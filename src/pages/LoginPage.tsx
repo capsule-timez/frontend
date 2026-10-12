@@ -2,13 +2,17 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { AuthCard } from '../components/AuthCard/AuthCard'
+import { Alert } from '../components/Alert/Alert'
+import { Button } from '../components/Button/Button'
 import { FormField } from '../components/FormField/FormField'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { getApiError } from '../services/apiError'
 import type { ApiError } from '../services/apiError'
 
 export function LoginPage() {
   const { login } = useAuth()
+  const toast = useToast()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
@@ -22,6 +26,7 @@ export function LoginPage() {
     try {
       // Ao autenticar, o PublicOnlyRoute redireciona para a listagem.
       await login({ email, password })
+      toast.success('Bem-vindo de volta!', { description: 'Suas cápsulas estão te esperando.' })
     } catch (err) {
       setError(getApiError(err))
       setIsSubmitting(false)
@@ -30,7 +35,8 @@ export function LoginPage() {
 
   return (
     <AuthCard
-      title="Entrar"
+      title="Bem-vindo de volta"
+      subtitle="Entre para acompanhar suas cápsulas do tempo."
       footer={
         <>
           Ainda não tem conta? <Link to="/cadastro">Criar conta</Link>
@@ -38,11 +44,7 @@ export function LoginPage() {
       }
     >
       <form className="auth-card__form" onSubmit={handleSubmit}>
-        {error && (
-          <p className="auth-card__alert" role="alert">
-            {error.message}
-          </p>
-        )}
+        {error && <Alert tone="error">{error.message}</Alert>}
         <FormField
           label="E-mail"
           type="email"
@@ -63,9 +65,9 @@ export function LoginPage() {
           onChange={(event) => setPassword(event.target.value)}
           error={error?.fieldErrors.password}
         />
-        <button className="auth-card__submit" type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Entrando...' : 'Entrar'}
-        </button>
+        <Button type="submit" fullWidth loading={isSubmitting}>
+          {isSubmitting ? 'Entrando…' : 'Entrar'}
+        </Button>
       </form>
     </AuthCard>
   )
