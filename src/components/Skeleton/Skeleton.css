@@ -1,0 +1,23 @@
+.skeleton {
+  display: block;
+  border: var(--stroke-thin);
+  background-image: repeating-linear-gradient(
+    45deg,
+    var(--color-paper-dark) 0 10px,
+    var(--color-paper) 10px 20px
+  );
+  background-size: 28px 28px;
+  animation: skeleton-march 0.8s linear infinite;
+}
+
+@keyframes skeleton-march {
+  to {
+    background-position: 28px 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

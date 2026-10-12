@@ -1,0 +1,27 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.logo__mark {
+  display: inline-flex;
+  padding: 0.35rem;
+  border: var(--stroke);
+  background-color: var(--color-yellow);
+  box-shadow: 3px 3px 0 0 var(--color-ink);
+  color: var(--color-ink);
+  transition: transform var(--duration-base) var(--ease-spring);
+}
+
+.logo:hover .logo__mark {
+  transform: rotate(180deg);
+}
+
+.logo__text {
+  font-family: var(--font-display);
+  font-size: 1.1rem;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-transform: uppercase;
+}

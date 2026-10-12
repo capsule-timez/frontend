@@ -1,18 +1,39 @@
+
 :root {
-  --color-indigo-deep: #2b2456;
-  --color-indigo-primary: #4c4099;
-  --color-indigo-light: #edebf7;
-  --color-amber: #d99a2b;
+  /* Paleta */
+  --color-ink: #1f130b; 
+  --color-paper: #e7d0a4; 
+  --color-paper-dark: #d4b988;
+  --color-surface: #fffbf2;
+  --color-brown: #543c2d;
+  --color-orange: #ef8d53; 
+  --color-yellow: #f5c04a; 
+  --color-yellow-soft: #fbe3a0;
+  --color-green: #79c493;
+  --color-red: #e8503f;
+  --color-error-text: #b3261e;
+  --color-muted: #5c4636;
 
-  --color-background: #faf9f6;
-  --color-surface: #ffffff;
-  --color-border: #e5e3dc;
-  --color-text-secondary: #6b6a64;
+  --color-primary: var(--color-orange);
+  --color-danger: var(--color-red);
+  --color-warning: var(--color-yellow);
+  --color-success: var(--color-green);
 
-  --color-status-scheduled-bg: #fbf1df;
-  --color-status-scheduled-text: #6b4a0a;
-  --color-status-sent-bg: #e1f5ee;
-  --color-status-sent-text: #0f6e56;
-  --color-status-failed-bg: #fcebeb;
-  --color-status-failed-text: #a32d2d;
+  --font-display: 'Archivo Black', 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+  --font-body: 'Space Grotesk', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --stroke: 3px solid var(--color-ink);
+  --stroke-thin: 2px solid var(--color-ink);
+  --radius: 0;
+
+  --shadow-0: 0 0 0 0 var(--color-ink);
+  --shadow-1: 4px 4px 0 0 var(--color-ink);
+  --shadow-2: 8px 8px 0 0 var(--color-ink);
+  --shadow-3: 12px 12px 0 0 var(--color-ink);
+
+  --ease-out: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --duration-fast: 90ms;
+  --duration-base: 180ms;
+  --duration-slow: 420ms;
 }

@@ -1,57 +1,58 @@
 .auth-card {
+  position: relative;
   width: 100%;
-  max-width: 26rem;
-  margin: 1rem auto;
+  max-width: 27rem;
+  margin: 2rem auto;
   padding: 2rem;
+  border: var(--stroke);
   background-color: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
+  box-shadow: var(--shadow-3);
+}
+
+.auth-card::after {
+  content: 'Acesso';
+  position: absolute;
+  top: -1rem;
+  right: -0.75rem;
+  padding: 0.2rem 0.6rem;
+  border: var(--stroke);
+  background-color: var(--color-yellow);
+  box-shadow: 3px 3px 0 0 var(--color-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  transform: rotate(4deg);
+}
+
+.auth-card__brand {
+  margin-bottom: 1.25rem;
 }
 
 .auth-card__title {
-  margin: 0 0 1.5rem;
-  font-size: 1.5rem;
-  color: var(--color-indigo-deep);
+  margin: 0;
+  font-size: 2.1rem;
+  text-transform: uppercase;
+}
+
+.auth-card__subtitle {
+  margin: 0.5rem 0 0;
+  color: var(--color-muted);
+  font-weight: 500;
 }
 
 .auth-card__form {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-}
-
-.auth-card__alert {
-  margin: 0;
-  padding: 0.75rem 1rem;
-  font-size: 0.875rem;
-  color: var(--color-status-failed-text);
-  background-color: var(--color-status-failed-bg);
-  border-radius: 8px;
-}
-
-.auth-card__submit {
-  padding: 0.75rem 1rem;
-  font: inherit;
-  font-weight: 600;
-  color: var(--color-surface);
-  background-color: var(--color-indigo-primary);
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
-.auth-card__submit:hover:not(:disabled) {
-  background-color: var(--color-indigo-deep);
-}
-
-.auth-card__submit:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+  gap: 1.25rem;
+  margin-top: 1.75rem;
 }
 
 .auth-card__footer {
   margin: 1.5rem 0 0;
-  font-size: 0.875rem;
+  padding-top: 1rem;
+  border-top: var(--stroke-thin);
+  border-top-style: dashed;
+  font-size: 0.9rem;
   text-align: center;
-  color: var(--color-text-secondary);
 }

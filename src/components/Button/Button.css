@@ -1,0 +1,110 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1.25rem;
+  border: var(--stroke);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-1);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  line-height: 1.2;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    background-color var(--duration-fast) ease;
+}
+
+.btn:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 0 var(--color-ink);
+  background-color: var(--btn-hover, var(--color-yellow));
+}
+
+.btn:active:not(:disabled) {
+  transform: translate(4px, 4px);
+  box-shadow: var(--shadow-0);
+}
+
+.btn:disabled {
+  border-color: #8a8878;
+  background-color: #dcd7c3;
+  box-shadow: none;
+  color: #7a7968;
+  cursor: not-allowed;
+}
+
+.btn--sm {
+  padding: 0.4rem 0.75rem;
+  font-size: 0.8rem;
+}
+
+.btn--full {
+  width: 100%;
+}
+
+.btn--primary {
+  background-color: var(--color-orange);
+  --btn-hover: var(--color-orange);
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-color: #f7a671;
+}
+
+.btn--secondary {
+  background-color: var(--color-surface);
+}
+
+.btn--dark {
+  background-color: var(--color-ink);
+  box-shadow: 4px 4px 0 0 var(--color-yellow);
+  color: var(--color-surface);
+  --btn-hover: var(--color-ink);
+}
+
+.btn--dark:hover:not(:disabled) {
+  box-shadow: 6px 6px 0 0 var(--color-yellow);
+}
+
+.btn--ghost {
+  border-color: transparent;
+  background-color: transparent;
+  box-shadow: none;
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 4px;
+  --btn-hover: var(--color-yellow);
+}
+
+.btn--ghost:hover:not(:disabled) {
+  border-color: var(--color-ink);
+  transform: none;
+  box-shadow: none;
+}
+
+.btn--ghost:active:not(:disabled) {
+  transform: none;
+}
+
+.btn__spinner {
+  width: 1em;
+  height: 1em;
+  border: 3px solid currentColor;
+  border-right-color: transparent;
+  animation: btn-spin 0.6s steps(8) infinite;
+}
+
+@keyframes btn-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
