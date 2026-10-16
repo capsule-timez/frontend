@@ -19,6 +19,25 @@
   box-shadow: 11px 11px 0 0 var(--color-ink);
 }
 
+.capsule-card__link {
+  text-decoration: none;
+}
+
+.capsule-card__link::after {
+  position: absolute;
+  inset: 0;
+  content: '';
+}
+
+.capsule-card__link:hover {
+  background: none;
+}
+
+.capsule-card:has(.capsule-card__link:focus-visible) {
+  outline: 4px solid var(--color-ink);
+  outline-offset: 3px;
+}
+
 .capsule-card--scheduled {
   --status-color: var(--color-yellow);
 }
