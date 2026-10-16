@@ -1,4 +1,5 @@
 import type { CSSProperties } from 'react'
+import { Link } from 'react-router-dom'
 import type { CapsuleStatus, CapsuleSummary } from '../../types/capsule'
 import { formatDateTime, formatRelativeTime, isInFuture } from '../../utils/formatDate'
 import { Card } from '../Card/Card'
@@ -66,7 +67,11 @@ export function CapsuleCard({ capsule, index = 0 }: CapsuleCardProps) {
         )}
       </div>
 
-      <h2 className="capsule-card__title">{capsule.title}</h2>
+      <h2 className="capsule-card__title">
+        <Link className="capsule-card__link" to={`/capsulas/${encodeURIComponent(capsule.id)}`}>
+          {capsule.title}
+        </Link>
+      </h2>
       <p className="capsule-card__highlight">{getHighlight(capsule)}</p>
 
       {progress !== null && (

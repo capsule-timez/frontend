@@ -8,6 +8,11 @@ import type {
 } from '../types/capsule'
 import { httpClient } from './httpClient'
 
+export async function getCapsule(id: string, signal?: AbortSignal): Promise<Capsule> {
+  const { data } = await httpClient.get<Capsule>(`/api/capsules/${encodeURIComponent(id)}`, { signal })
+  return data
+}
+
 export async function createCapsule(input: CreateCapsuleInput): Promise<Capsule> {
   const { data } = await httpClient.post<Capsule>('/api/capsules', input)
   return data

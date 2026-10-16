@@ -97,6 +97,8 @@ A URL da API nunca deve ser fixada no código. Toda chamada passa pelo cliente H
 
 A listagem consome `GET /api/capsules` (cápsulas do usuário autenticado, ordenadas pela data de entrega), em `src/services/capsuleService.ts`.
 
+Os cards abrem a rota protegida `/capsulas/:id`, que consulta `GET /api/capsules/{id}` e exibe os dados e anexos da cápsula. Consulte a [documentação do detalhe, validação e capturas de tela](docs/capsula-detalhe.md).
+
 ### Execução
 
 ```bash
