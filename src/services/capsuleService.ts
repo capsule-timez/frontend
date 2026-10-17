@@ -18,11 +18,14 @@ export async function createCapsule(input: CreateCapsuleInput): Promise<Capsule>
   return data
 }
 
-export async function listCapsules(): Promise<CapsuleSummary[]> {
+export async function listCapsules(
+  params: { status?: CapsuleSummary['status']; page?: number } = {},
+  signal?: AbortSignal,
+): Promise<PaginatedResponse<CapsuleSummary>> {
   const { data } = await httpClient.get<PaginatedResponse<CapsuleSummary>>('/api/capsules', {
-    params: { pageSize: 100 },
+    params: { ...params, pageSize: 20 }, signal,
   })
-  return data.data
+  return data
 }
 
 export interface ApiErrorDetails {

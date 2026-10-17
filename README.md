@@ -97,6 +97,12 @@ A URL da API nunca deve ser fixada no código. Toda chamada passa pelo cliente H
 
 A listagem consome `GET /api/capsules` (cápsulas do usuário autenticado, ordenadas pela data de entrega), em `src/services/capsuleService.ts`.
 
+O seletor de status consulta a API com `status=SCHEDULED`, `SENT` ou `FAILED`; **Todas** omite esse parâmetro. Cada página solicita `pageSize=20`, e a navegação usa `meta.totalPages`. Ao trocar o status, a página volta para 1. Filtro e página ficam na URL, por exemplo `/capsulas?status=SENT&page=2`, permitindo recarregar e usar o histórico do navegador. A listagem depende exclusivamente da API, sem fallback local.
+
+Para validar: crie mais de 20 cápsulas na mesma conta, confira os botões **Anterior** e **Próxima** e alterne entre **Todas**, **Agendadas**, **Enviadas** e **Falharam**. Na aba Network, confira `GET /api/capsules` com o status selecionado, `page` e `pageSize=20`. Os testes do serviço podem ser executados com `npm test`.
+
+Veja os detalhes da implementação, os passos de validação e as [capturas de filtro e paginação](docs/listagem-filtros-paginacao.md).
+
 Os cards abrem a rota protegida `/capsulas/:id`, que consulta `GET /api/capsules/{id}` e exibe os dados e anexos da cápsula. Consulte a [documentação do detalhe, validação e capturas de tela](docs/capsula-detalhe.md).
 
 ### Execução

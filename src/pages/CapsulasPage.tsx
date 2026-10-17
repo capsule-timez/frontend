@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { CapsuleCard, CapsuleCardSkeleton } from '../components/CapsuleCard/CapsuleCard'
 import { EmptyState } from '../components/EmptyState/EmptyState'
@@ -6,170 +7,114 @@ import { Hero } from '../components/Hero/Hero'
 import { SegmentedControl } from '../components/SegmentedControl/SegmentedControl'
 import { useAuth } from '../contexts/AuthContext'
 import { getApiErrorDetails, listCapsules } from '../services/capsuleService'
-import type { CapsuleStatus, CapsuleSummary } from '../types/capsule'
-import { formatDateTime, formatRelativeTime, isInFuture } from '../utils/formatDate'
+import type { CapsuleStatus, CapsuleSummary, PaginatedResponse } from '../types/capsule'
 import './CapsulasPage.css'
 
 type StatusFilter = 'ALL' | CapsuleStatus
-
 type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'success'; capsules: CapsuleSummary[] }
-
-const SKELETON_COUNT = 3
-
-function sortCapsules(capsules: CapsuleSummary[]): CapsuleSummary[] {
-  const upcoming = capsules
-    .filter((capsule) => capsule.status === 'SCHEDULED')
-    .sort((a, b) => Date.parse(a.scheduleDate) - Date.parse(b.scheduleDate))
-  const history = capsules
-    .filter((capsule) => capsule.status !== 'SCHEDULED')
-    .sort((a, b) => Date.parse(b.scheduleDate) - Date.parse(a.scheduleDate))
-
-  return [...upcoming, ...history]
-}
-
-function countByStatus(capsules: CapsuleSummary[], status: CapsuleStatus): number {
-  return capsules.filter((capsule) => capsule.status === status).length
-}
+  | { status: 'success'; result: PaginatedResponse<CapsuleSummary> }
 
 export function CapsulasPage() {
   const { user } = useAuth()
-  const [state, setState] = useState<LoadState>({ status: 'loading' })
-  const [filter, setFilter] = useState<StatusFilter>('ALL')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const status = searchParams.get('status')
+  const filter: StatusFilter = status === 'SCHEDULED' || status === 'SENT' || status === 'FAILED' ? status : 'ALL'
+  const requestedPage = Number(searchParams.get('page') ?? 1)
+  const page = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1
 
-  const load = useCallback(
-    () =>
-      listCapsules()
-        .then((capsules) => setState({ status: 'success', capsules: sortCapsules(capsules) }))
-        .catch((error: unknown) =>
-          setState({ status: 'error', message: getApiErrorDetails(error).message }),
-        ),
-    [],
-  )
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  function retry() {
-    setState({ status: 'loading' })
-    void load()
+  function navigate(nextFilter: StatusFilter, nextPage: number) {
+    setSearchParams((current) => {
+      const params = new URLSearchParams(current)
+      if (nextFilter === 'ALL') params.delete('status')
+      else params.set('status', nextFilter)
+      params.set('page', String(nextPage))
+      return params
+    })
   }
-
-  const capsules = useMemo(() => (state.status === 'success' ? state.capsules : []), [state])
-  const visibleCapsules = useMemo(
-    () => (filter === 'ALL' ? capsules : capsules.filter((capsule) => capsule.status === filter)),
-    [capsules, filter],
-  )
-
-  const nextCapsule = capsules.find(
-    (capsule) => capsule.status === 'SCHEDULED' && isInFuture(capsule.scheduleDate),
-  )
-  const firstName = user?.name.split(' ')[0]
 
   return (
     <section className="capsulas">
       <Hero
-        eyebrow={firstName ? `Olá, ${firstName}` : 'Olá'}
-        title={
-          nextCapsule
-            ? `“${nextCapsule.title}” chega ${formatRelativeTime(nextCapsule.scheduleDate)}`
-            : 'Guarde algo para o futuro'
-        }
-        description={
-          nextCapsule
-            ? `Lacrada até ${formatDateTime(nextCapsule.scheduleDate)}.`
-            : 'Escreva uma mensagem hoje e deixe que ela chegue quando o momento certo vier.'
-        }
-        actions={
-          <ButtonLink to="/capsulas/nova" variant="dark" icon="plus">
-            Nova cápsula
-          </ButtonLink>
-        }
-        stats={
-          state.status === 'success' && capsules.length > 0
-            ? [
-                { label: 'Agendadas', value: countByStatus(capsules, 'SCHEDULED') },
-                { label: 'Enviadas', value: countByStatus(capsules, 'SENT') },
-                { label: 'Total', value: capsules.length },
-              ]
-            : undefined
-        }
+        eyebrow={user ? `Olá, ${user.name.split(' ')[0]}` : 'Olá'}
+        title="Suas mensagens para o futuro"
+        description="Acompanhe suas cápsulas e os próximos envios."
+        actions={<ButtonLink to="/capsulas/nova" variant="dark" icon="plus">Nova cápsula</ButtonLink>}
       />
-
-      {state.status === 'loading' && (
-        <ul className="capsulas__list" aria-busy="true" aria-label="Carregando cápsulas">
-          {Array.from({ length: SKELETON_COUNT }, (_, index) => (
-            <CapsuleCardSkeleton key={index} />
-          ))}
-        </ul>
-      )}
-
-      {state.status === 'error' && (
-        <EmptyState
-          icon="alert"
-          title="Não foi possível carregar suas cápsulas"
-          description={state.message}
-          action={
-            <Button variant="secondary" onClick={retry}>
-              Tentar novamente
-            </Button>
-          }
+      <div className="capsulas__toolbar">
+        <h2 className="capsulas__heading">Suas cápsulas</h2>
+        <SegmentedControl<StatusFilter> label="Filtrar por status" value={filter}
+          onChange={(value) => navigate(value, 1)}
+          options={[
+            { value: 'ALL', label: 'Todas' },
+            { value: 'SCHEDULED', label: 'Agendadas' },
+            { value: 'SENT', label: 'Enviadas' },
+            { value: 'FAILED', label: 'Falharam' },
+          ]}
         />
-      )}
-
-      {state.status === 'success' && capsules.length === 0 && (
-        <EmptyState
-          icon="hourglass"
-          title="Nenhuma cápsula por aqui ainda"
-          description="Escreva uma mensagem hoje e deixe que ela chegue no futuro."
-          action={
-            <ButtonLink to="/capsulas/nova" icon="plus">
-              Criar primeira cápsula
-            </ButtonLink>
-          }
-        />
-      )}
-
-      {state.status === 'success' && capsules.length > 0 && (
-        <>
-          <div className="capsulas__toolbar">
-            <h2 className="capsulas__heading">Suas cápsulas</h2>
-            <SegmentedControl<StatusFilter>
-              label="Filtrar por status"
-              value={filter}
-              onChange={setFilter}
-              options={[
-                { value: 'ALL', label: 'Todas', count: capsules.length },
-                { value: 'SCHEDULED', label: 'Agendadas', count: countByStatus(capsules, 'SCHEDULED') },
-                { value: 'SENT', label: 'Enviadas', count: countByStatus(capsules, 'SENT') },
-                { value: 'FAILED', label: 'Com falha', count: countByStatus(capsules, 'FAILED') },
-              ]}
-            />
-          </div>
-
-          {visibleCapsules.length === 0 ? (
-            <EmptyState
-              icon="mail"
-              title="Nenhuma cápsula neste filtro"
-              action={
-                <Button variant="secondary" onClick={() => setFilter('ALL')}>
-                  Ver todas
-                </Button>
-              }
-            />
-          ) : (
-     
-            <ul key={filter} className="capsulas__list">
-              {visibleCapsules.map((capsule, index) => (
-                <CapsuleCard key={capsule.id} capsule={capsule} index={index} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
+      </div>
+      <CapsuleResults key={`${filter}:${page}`} filter={filter} page={page}
+        onPageChange={(value) => navigate(filter, value)} onClearFilter={() => navigate('ALL', 1)} />
     </section>
+  )
+}
+
+function CapsuleResults({ filter, page, onPageChange, onClearFilter }: {
+  filter: StatusFilter
+  page: number
+  onPageChange: (page: number) => void
+  onClearFilter: () => void
+}) {
+  const [state, setState] = useState<LoadState>({ status: 'loading' })
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    listCapsules({ status: filter === 'ALL' ? undefined : filter, page }, controller.signal)
+      .then((result) => {
+        if (!controller.signal.aborted) setState({ status: 'success', result })
+      })
+      .catch((error: unknown) => {
+        if (!controller.signal.aborted) setState({ status: 'error', message: getApiErrorDetails(error).message })
+      })
+    return () => controller.abort()
+  }, [filter, page, attempt])
+
+  if (state.status === 'loading') return (
+    <ul className="capsulas__list" aria-busy="true" aria-label="Carregando cápsulas">
+      {Array.from({ length: 3 }, (_, index) => <CapsuleCardSkeleton key={index} />)}
+    </ul>
+  )
+  if (state.status === 'error') return (
+    <EmptyState icon="alert" title="Não foi possível carregar suas cápsulas" description={state.message}
+      action={<Button variant="secondary" onClick={() => {
+        setState({ status: 'loading' })
+        setAttempt((value) => value + 1)
+      }}>Tentar novamente</Button>} />
+  )
+
+  const { data: capsules, meta } = state.result
+  return (
+    <>
+      {capsules.length > 0 ? (
+        <ul className="capsulas__list">
+          {capsules.map((capsule, index) => <CapsuleCard key={capsule.id} capsule={capsule} index={index} />)}
+        </ul>
+      ) : (
+        <EmptyState icon="hourglass"
+          title={page > 1 ? 'Nenhuma cápsula nesta página' : filter === 'ALL' ? 'Nenhuma cápsula por aqui ainda' : 'Nenhuma cápsula neste filtro'}
+          action={page > 1 ? <Button variant="secondary" onClick={() => onPageChange(1)}>Voltar à primeira página</Button>
+            : filter !== 'ALL' ? <Button variant="secondary" onClick={onClearFilter}>Ver todas</Button>
+              : <ButtonLink to="/capsulas/nova" icon="plus">Criar primeira cápsula</ButtonLink>} />
+      )}
+      {meta.totalPages > 0 && (
+        <nav className="capsulas__pagination" aria-label="Paginação de cápsulas">
+          <Button variant="secondary" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Anterior</Button>
+          <span role="status">Página {page} de {meta.totalPages} · {meta.total} cápsulas</span>
+          <Button variant="secondary" disabled={page >= meta.totalPages} onClick={() => onPageChange(page + 1)}>Próxima</Button>
+        </nav>
+      )}
+    </>
   )
 }
