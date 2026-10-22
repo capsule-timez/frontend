@@ -47,3 +47,8 @@
   gap: 0.75rem;
   padding-left: 1.25rem;
 }
+
+.capsula-detalhe__actions {
+  display: flex;
+  justify-content: flex-end;
+}
