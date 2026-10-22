@@ -32,6 +32,10 @@
   animation-delay: 160ms;
 }
 
+.nova-capsula__step:nth-of-type(4) {
+  animation-delay: 240ms;
+}
+
 .nova-capsula__step--highlight {
   background-color: var(--color-yellow);
 }
