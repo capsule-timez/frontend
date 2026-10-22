@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   ApiErrorBody,
   Capsule,
+  CapsuleFile,
   CapsuleSummary,
   CreateCapsuleInput,
   PaginatedResponse,
@@ -15,6 +16,16 @@ export async function getCapsule(id: string, signal?: AbortSignal): Promise<Caps
 
 export async function createCapsule(input: CreateCapsuleInput): Promise<Capsule> {
   const { data } = await httpClient.post<Capsule>('/api/capsules', input)
+  return data
+}
+
+export async function uploadCapsuleFile(id: string, file: File): Promise<CapsuleFile> {
+  const form = new FormData()
+  form.append('file', file)
+  const { data } = await httpClient.post<CapsuleFile>(
+    `/api/capsules/${encodeURIComponent(id)}/files`,
+    form,
+  )
   return data
 }
 
