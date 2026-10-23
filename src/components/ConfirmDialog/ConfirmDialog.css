@@ -1,0 +1,28 @@
+.confirm-dialog {
+  width: min(90vw, 28rem);
+  padding: 1.5rem;
+  border: var(--stroke);
+  border-radius: var(--radius);
+  background-color: var(--color-surface);
+  box-shadow: var(--shadow-2);
+  color: var(--color-ink);
+}
+
+.confirm-dialog::backdrop {
+  background-color: rgb(31 19 11 / 0.6);
+}
+
+.confirm-dialog__title {
+  margin: 0 0 0.75rem;
+}
+
+.confirm-dialog__description {
+  margin: 0 0 1.5rem;
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}

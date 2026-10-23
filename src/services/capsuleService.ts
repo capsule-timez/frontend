@@ -29,6 +29,10 @@ export async function uploadCapsuleFile(id: string, file: File): Promise<Capsule
   return data
 }
 
+export async function deleteCapsule(id: string): Promise<void> {
+  await httpClient.delete(`/api/capsules/${encodeURIComponent(id)}`)
+}
+
 export async function listCapsules(
   params: { status?: CapsuleSummary['status']; page?: number } = {},
   signal?: AbortSignal,

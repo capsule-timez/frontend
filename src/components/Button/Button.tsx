@@ -4,7 +4,7 @@ import { Icon, type IconName } from '../Icon/Icon'
 import './Button.css'
 
 interface ButtonStyleProps {
-  variant?: 'primary' | 'secondary' | 'ghost' | 'dark'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'dark' | 'danger'
   size?: 'md' | 'sm'
   fullWidth?: boolean
   icon?: IconName
