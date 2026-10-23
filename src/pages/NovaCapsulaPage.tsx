@@ -5,11 +5,14 @@ import { Button, ButtonLink } from '../components/Button/Button'
 import { FormField } from '../components/FormField/FormField'
 import { TextAreaField } from '../components/FormField/TextAreaField'
 import { Icon, type IconName } from '../components/Icon/Icon'
+import { ImagePicker } from '../components/ImagePicker/ImagePicker'
 import { PageHeader } from '../components/PageHeader/PageHeader'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { useImageSelection } from '../hooks/useImageSelection'
 import { createCapsule, getApiErrorDetails } from '../services/capsuleService'
 import { formatDateTime, formatRelativeTime } from '../utils/formatDate'
+import { MAX_IMAGES_PER_CAPSULE } from '../utils/imageValidation'
 import {
   TEXT_MAX_LENGTH,
   TITLE_MAX_LENGTH,
@@ -63,6 +66,7 @@ export function NovaCapsulaPage() {
   const [errors, setErrors] = useState<CapsuleFormErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const images = useImageSelection(MAX_IMAGES_PER_CAPSULE)
 
   const minScheduleDate = toDateTimeLocalValue(getMinScheduleDate())
   const scheduleIso =
@@ -129,6 +133,15 @@ export function NovaCapsulaPage() {
         recipientEmail,
         scheduleDate: new Date(values.scheduleDate).toISOString(),
       })
+      // A cápsula já existe; falha em imagens não a desfaz, o usuário reenvia pelo detalhe.
+      const uploads = images.items.length > 0 ? await images.upload(capsule.id) : { sent: 0, failed: 0 }
+      if (uploads.failed > 0) {
+        toast.error('Cápsula criada, mas algumas imagens não foram enviadas', {
+          description: 'Abra a cápsula para tentar enviar as imagens novamente.',
+        })
+        navigate(`/capsulas/${capsule.id}`)
+        return
+      }
       toast.success('Cápsula agendada!', {
         description: `“${capsule.title}” será entregue ${formatRelativeTime(capsule.scheduleDate)}.`,
       })
@@ -279,12 +292,27 @@ export function NovaCapsulaPage() {
           )}
         </fieldset>
 
+        <fieldset className="nova-capsula__step">
+          <legend className="nova-capsula__step-title">
+            <span className="nova-capsula__step-number">4</span>
+            Imagens (opcional)
+          </legend>
+          <ImagePicker
+            items={images.items}
+            rejections={images.rejections}
+            maxFiles={MAX_IMAGES_PER_CAPSULE}
+            disabled={isSubmitting}
+            onAdd={images.add}
+            onRemove={images.remove}
+          />
+        </fieldset>
+
         <div className="nova-capsula__actions">
           <ButtonLink to="/capsulas" variant="ghost">
             Cancelar
           </ButtonLink>
           <Button type="submit" icon="lock" loading={isSubmitting}>
-            {isSubmitting ? 'Lacrando…' : 'Lacrar cápsula'}
+            {isSubmitting ? (images.isUploading ? 'Enviando imagens…' : 'Lacrando…') : 'Lacrar cápsula'}
           </Button>
         </div>
       </form>
