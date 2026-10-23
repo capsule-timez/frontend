@@ -1,12 +1,14 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { Card } from '../components/Card/Card'
 import { CapsuleStatusBadge } from '../components/CapsuleStatusBadge/CapsuleStatusBadge'
+import { ConfirmDialog } from '../components/ConfirmDialog/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState/EmptyState'
 import { PageHeader } from '../components/PageHeader/PageHeader'
-import { getApiErrorDetails, getCapsule } from '../services/capsuleService'
+import { useToast } from '../contexts/ToastContext'
+import { deleteCapsule, getApiErrorDetails, getCapsule } from '../services/capsuleService'
 import type { Capsule } from '../types/capsule'
 import { formatDateTime } from '../utils/formatDate'
 import './CapsulaDetalhePage.css'
@@ -26,6 +28,29 @@ export function CapsulaDetalhePage() {
 function CapsulaDetalhe({ id }: { id: string }) {
   const [state, setState] = useState<LoadState>({ status: 'loading' })
   const [attempt, setAttempt] = useState(0)
+  const [confirmingDelete, setConfirmingDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const navigate = useNavigate()
+  const toast = useToast()
+
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      await deleteCapsule(id)
+      toast.success('Cápsula excluída com sucesso.')
+      navigate('/capsulas')
+    } catch (error) {
+      const { code, message } = getApiErrorDetails(error)
+      toast.error(message)
+      setDeleting(false)
+      setConfirmingDelete(false)
+      // Status mudou (ex.: já enviada) ou a cápsula sumiu: recarrega para refletir o estado real.
+      if (code === 'CAPSULE_NOT_EDITABLE' || code === 'NOT_FOUND') {
+        setState({ status: 'loading' })
+        setAttempt((value) => value + 1)
+      }
+    }
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -87,6 +112,22 @@ function CapsulaDetalhe({ id }: { id: string }) {
               </ul>
             )}
           </Card>
+          {state.capsule.status === 'SCHEDULED' && (
+            <div className="capsula-detalhe__actions">
+              <Button variant="danger" icon="trash" onClick={() => setConfirmingDelete(true)}>
+                Excluir cápsula
+              </Button>
+            </div>
+          )}
+          <ConfirmDialog
+            open={confirmingDelete}
+            title="Excluir esta cápsula?"
+            description="A cápsula e seus anexos serão removidos e ela não será mais enviada. Esta ação não pode ser desfeita."
+            confirmLabel="Excluir"
+            loading={deleting}
+            onConfirm={() => void handleDelete()}
+            onCancel={() => setConfirmingDelete(false)}
+          />
         </>
       )}
     </section>

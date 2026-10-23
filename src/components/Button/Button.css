@@ -75,6 +75,15 @@
   box-shadow: 6px 6px 0 0 var(--color-yellow);
 }
 
+.btn--danger {
+  background-color: var(--color-red);
+  --btn-hover: var(--color-red);
+}
+
+.btn--danger:hover:not(:disabled) {
+  background-color: #ee6b5c;
+}
+
 .btn--ghost {
   border-color: transparent;
   background-color: transparent;
