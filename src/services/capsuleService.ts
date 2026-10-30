@@ -6,11 +6,20 @@ import type {
   CapsuleSummary,
   CreateCapsuleInput,
   PaginatedResponse,
+  PublicCapsule,
 } from '../types/capsule'
 import { httpClient } from './httpClient'
 
 export async function getCapsule(id: string, signal?: AbortSignal): Promise<Capsule> {
   const { data } = await httpClient.get<Capsule>(`/api/capsules/${encodeURIComponent(id)}`, { signal })
+  return data
+}
+
+export async function getPublicCapsule(token: string, signal?: AbortSignal): Promise<PublicCapsule> {
+  const { data } = await httpClient.get<PublicCapsule>(
+    `/api/public/capsules/${encodeURIComponent(token)}`,
+    { signal },
+  )
   return data
 }
 
