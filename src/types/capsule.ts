@@ -22,6 +22,14 @@ export interface Capsule {
   files: CapsuleFile[]
 }
 
+export interface PublicCapsule {
+  title: string
+  text: string
+  creatorName: string
+  sentAt: string
+  files: CapsuleFile[]
+}
+
 /** Item da listagem: sem `text` e `files`, com a contagem de anexos. */
 export type CapsuleSummary = Omit<Capsule, 'text' | 'files'> & { fileCount: number }
 
