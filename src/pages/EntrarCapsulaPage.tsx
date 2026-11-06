@@ -46,7 +46,7 @@ export function EntrarCapsulaPage() {
       <ButtonLink to="/capsulas" variant="ghost">Voltar para cápsulas</ButtonLink>
       <PageHeader
         title="Entrar em uma cápsula"
-        description="Recebeu um código de convite? Use-o para participar de uma cápsula em grupo."
+        description="Recebeu um código de convite? Entre para deixar 1 texto e 1 imagem. Na data de entrega, a cápsula chega no e-mail de todos os participantes."
       />
       <Card className="entrar-capsula__card">
         <form className="entrar-capsula__form" onSubmit={handleSubmit} noValidate>
