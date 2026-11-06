@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  TEXT_MAX_LENGTH,
   getMinContributionDeadline,
   toDateTimeLocalValue,
   validateCapsuleForm,
   validateContributionDeadline,
+  validateContributionText,
   type CapsuleFormValues,
 } from '../src/utils/capsuleValidation'
 
@@ -80,7 +82,39 @@ describe('getMinContributionDeadline', () => {
   })
 })
 
+describe('validateContributionText', () => {
+  it('accepts a message up to the limit', () => {
+    expect(validateContributionText('Olá, turma')).toBeUndefined()
+    expect(validateContributionText('a'.repeat(TEXT_MAX_LENGTH))).toBeUndefined()
+  })
+
+  it.each(['', '   '])('requires a message (%j)', (value) => {
+    expect(validateContributionText(value)).toBe('Escreva sua mensagem.')
+  })
+
+  it('rejects a message over the limit', () => {
+    expect(validateContributionText('a'.repeat(TEXT_MAX_LENGTH + 1))).toBe(
+      'A mensagem deve ter no máximo 10.000 caracteres.',
+    )
+  })
+})
+
 describe('validateCapsuleForm', () => {
+  it('does not validate the recipient of a group capsule', () => {
+    const values = {
+      ...baseValues,
+      type: 'GROUP' as const,
+      contributionDeadline: local(2026, 6, 20),
+      recipientMode: 'other' as const,
+      recipientEmail: 'invalido',
+    }
+
+    expect(validateCapsuleForm(values, now)).toEqual({})
+    expect(validateCapsuleForm({ ...values, type: 'INDIVIDUAL' }, now)).toEqual({
+      recipientEmail: 'Informe um e-mail válido.',
+    })
+  })
+
   it('ignores the deadline of an individual capsule', () => {
     expect(validateCapsuleForm(baseValues, now)).toEqual({})
     expect(validateCapsuleForm({ ...baseValues, contributionDeadline: local(2020, 1, 1) }, now)).toEqual({})
