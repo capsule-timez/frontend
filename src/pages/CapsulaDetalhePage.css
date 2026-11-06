@@ -28,6 +28,12 @@
   border-bottom: var(--stroke-thin);
 }
 
+.capsula-detalhe__meta:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .capsula-detalhe__meta dt {
   font-weight: 700;
   margin-bottom: 0.5rem;
