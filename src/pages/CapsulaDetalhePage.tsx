@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { Badge } from '../components/Badge/Badge'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { Card } from '../components/Card/Card'
+import { CapsuleContribution } from '../components/CapsuleContribution/CapsuleContribution'
 import { CapsuleStatusBadge } from '../components/CapsuleStatusBadge/CapsuleStatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState/EmptyState'
@@ -46,13 +47,17 @@ function CapsulaDetalhe({ id }: { id: string }) {
   // As imagens já anexadas ocupam vagas do limite por cápsula.
   const images = useImageSelection(MAX_IMAGES_PER_CAPSULE - attachedCount)
 
+  async function refreshCapsule() {
+    const capsule = await getCapsule(id)
+    setState({ status: 'success', capsule })
+  }
+
   async function handleUpload() {
     const { sent, failed } = await images.upload(id)
     if (sent > 0) {
       // Atualiza só os anexos, sem voltar para a tela de carregamento.
       try {
-        const capsule = await getCapsule(id)
-        setState({ status: 'success', capsule })
+        await refreshCapsule()
       } catch (error) {
         toast.error('Imagens enviadas, mas não foi possível atualizar a cápsula', {
           description: getApiErrorDetails(error).message,
@@ -127,7 +132,9 @@ function CapsulaDetalhe({ id }: { id: string }) {
           <PageHeader title={state.capsule.title} />
           <Card className="capsula-detalhe__content">
             <dl className="capsula-detalhe__meta">
-              <div><dt>Destinatário</dt><dd>{state.capsule.recipientEmail}</dd></div>
+              {isGroup
+                ? <div><dt>Destinatários</dt><dd>Todos os participantes</dd></div>
+                : <div><dt>Destinatário</dt><dd>{state.capsule.recipientEmail}</dd></div>}
               <div><dt>Data de entrega</dt><dd><time dateTime={state.capsule.scheduleDate}>{formatDateTime(state.capsule.scheduleDate)}</time></dd></div>
               <div><dt>Status</dt><dd><CapsuleStatusBadge status={state.capsule.status} /></dd></div>
               {isGroup && <div><dt>Tipo</dt><dd><Badge tone="info" icon="users">Grupo</Badge></dd></div>}
@@ -135,8 +142,12 @@ function CapsulaDetalhe({ id }: { id: string }) {
                 <div><dt>Prazo para contribuições</dt><dd><time dateTime={state.capsule.contributionDeadline}>{formatDateTime(state.capsule.contributionDeadline)}</time></dd></div>
               )}
             </dl>
-            <h2>Mensagem</h2>
-            <p className="capsula-detalhe__message">{state.capsule.text}</p>
+            {!isGroup && (
+              <>
+                <h2>Mensagem</h2>
+                <p className="capsula-detalhe__message">{state.capsule.text}</p>
+              </>
+            )}
           </Card>
           {isGroupCreator && state.capsule.inviteCode && (
             <Card className="capsula-detalhe__content">
@@ -153,36 +164,40 @@ function CapsulaDetalhe({ id }: { id: string }) {
                     <li key={participant.id}>
                       {participant.name}
                       {participant.isCreator && <Badge tone="warning">Criador</Badge>}
+                      {participant.hasContributed && <Badge tone="success" icon="check">Contribuiu</Badge>}
                     </li>
                   ))}
                 </ul>
               )}
             </Card>
           )}
-          <Card className="capsula-detalhe__content">
-            <h2>Anexos</h2>
-            {state.capsule.files.length === 0 ? <p>Nenhum anexo nesta cápsula.</p> : (
-              <ul className="capsula-detalhe__files">
-                {state.capsule.files.map((file) => (
-                  <li key={file.id}>
-                    {file.mimeType.startsWith('image/') && (
-                      <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer">
-                        <img
-                          className="capsula-detalhe__image"
-                          src={file.downloadUrl}
-                          alt={file.fileName}
-                          loading="lazy"
-                        />
-                      </a>
-                    )}
-                    <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer">{file.fileName}</a>
-                    <span> ({new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(file.fileSize / 1024)} KB)</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-          {state.capsule.status === 'SCHEDULED' && attachedCount < MAX_IMAGES_PER_CAPSULE && (
+          {isGroup && <CapsuleContribution capsule={state.capsule} onContributed={refreshCapsule} />}
+          {!isGroup && (
+            <Card className="capsula-detalhe__content">
+              <h2>Anexos</h2>
+              {state.capsule.files.length === 0 ? <p>Nenhum anexo nesta cápsula.</p> : (
+                <ul className="capsula-detalhe__files">
+                  {state.capsule.files.map((file) => (
+                    <li key={file.id}>
+                      {file.mimeType.startsWith('image/') && (
+                        <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer">
+                          <img
+                            className="capsula-detalhe__image"
+                            src={file.downloadUrl}
+                            alt={file.fileName}
+                            loading="lazy"
+                          />
+                        </a>
+                      )}
+                      <a href={file.downloadUrl} target="_blank" rel="noopener noreferrer">{file.fileName}</a>
+                      <span> ({new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(file.fileSize / 1024)} KB)</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
+          {!isGroup && state.capsule.status === 'SCHEDULED' && attachedCount < MAX_IMAGES_PER_CAPSULE && (
             <Card className="capsula-detalhe__content">
               <h2>Adicionar imagens</h2>
               <ImagePicker
