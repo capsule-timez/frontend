@@ -1,17 +1,21 @@
 import axios from 'axios'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { Badge } from '../components/Badge/Badge'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { Card } from '../components/Card/Card'
 import { CapsuleStatusBadge } from '../components/CapsuleStatusBadge/CapsuleStatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState/EmptyState'
 import { ImagePicker } from '../components/ImagePicker/ImagePicker'
+import { InviteCode } from '../components/InviteCode/InviteCode'
 import { PageHeader } from '../components/PageHeader/PageHeader'
+import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useImageSelection } from '../hooks/useImageSelection'
 import { deleteCapsule, getApiErrorDetails, getCapsule } from '../services/capsuleService'
 import type { Capsule } from '../types/capsule'
+import { isCapsuleCreator, isGroupCapsule } from '../utils/capsuleGroup'
 import { formatDateTime } from '../utils/formatDate'
 import { MAX_IMAGES_PER_CAPSULE } from '../utils/imageValidation'
 import './CapsulaDetalhePage.css'
@@ -35,6 +39,9 @@ function CapsulaDetalhe({ id }: { id: string }) {
   const [deleting, setDeleting] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
+  const { user } = useAuth()
+  const isGroup = state.status === 'success' && isGroupCapsule(state.capsule)
+  const isGroupCreator = isGroup && isCapsuleCreator(state.capsule, user?.id)
   const attachedCount = state.status === 'success' ? state.capsule.files.length : 0
   // As imagens já anexadas ocupam vagas do limite por cápsula.
   const images = useImageSelection(MAX_IMAGES_PER_CAPSULE - attachedCount)
@@ -123,10 +130,35 @@ function CapsulaDetalhe({ id }: { id: string }) {
               <div><dt>Destinatário</dt><dd>{state.capsule.recipientEmail}</dd></div>
               <div><dt>Data de entrega</dt><dd><time dateTime={state.capsule.scheduleDate}>{formatDateTime(state.capsule.scheduleDate)}</time></dd></div>
               <div><dt>Status</dt><dd><CapsuleStatusBadge status={state.capsule.status} /></dd></div>
+              {isGroup && <div><dt>Tipo</dt><dd><Badge tone="info" icon="users">Grupo</Badge></dd></div>}
+              {isGroup && state.capsule.contributionDeadline && (
+                <div><dt>Prazo para contribuições</dt><dd><time dateTime={state.capsule.contributionDeadline}>{formatDateTime(state.capsule.contributionDeadline)}</time></dd></div>
+              )}
             </dl>
             <h2>Mensagem</h2>
             <p className="capsula-detalhe__message">{state.capsule.text}</p>
           </Card>
+          {isGroupCreator && state.capsule.inviteCode && (
+            <Card className="capsula-detalhe__content">
+              <h2>Convide participantes</h2>
+              <InviteCode code={state.capsule.inviteCode} />
+            </Card>
+          )}
+          {isGroup && (
+            <Card className="capsula-detalhe__content">
+              <h2>Participantes</h2>
+              {!state.capsule.participants?.length ? <p>Nenhum participante nesta cápsula.</p> : (
+                <ul className="capsula-detalhe__participants">
+                  {state.capsule.participants.map((participant) => (
+                    <li key={participant.id}>
+                      {participant.name}
+                      {participant.isCreator && <Badge tone="warning">Criador</Badge>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          )}
           <Card className="capsula-detalhe__content">
             <h2>Anexos</h2>
             {state.capsule.files.length === 0 ? <p>Nenhum anexo nesta cápsula.</p> : (
@@ -170,7 +202,7 @@ function CapsulaDetalhe({ id }: { id: string }) {
               )}
             </Card>
           )}
-          {state.capsule.status === 'SCHEDULED' && (
+          {state.capsule.status === 'SCHEDULED' && (!isGroup || isGroupCreator) && (
             <div className="capsula-detalhe__actions">
               <Button variant="danger" icon="trash" onClick={() => setConfirmingDelete(true)}>
                 Excluir cápsula
