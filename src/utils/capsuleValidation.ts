@@ -1,22 +1,28 @@
-// Limites espelhados do contrato da API (backend src/schemas/capsule.schema.ts).
+import type { CapsuleType } from '../types/capsule'
+
 export const TITLE_MAX_LENGTH = 120
 export const TEXT_MAX_LENGTH = 10_000
 export const EMAIL_MAX_LENGTH = 254
-/** A API exige pelo menos 1 minuto de antecedência; a interface usa 2 por folga. */
 export const MIN_SCHEDULE_LEAD_MS = 2 * 60_000
 
 export type RecipientMode = 'self' | 'other'
 
 export interface CapsuleFormValues {
+  type: CapsuleType
   title: string
   text: string
-  /** Valor de um input datetime-local (`YYYY-MM-DDTHH:mm`), no fuso local. */
   scheduleDate: string
+  contributionDeadline: string
   recipientMode: RecipientMode
   recipientEmail: string
 }
 
-export type CapsuleFormField = 'title' | 'text' | 'scheduleDate' | 'recipientEmail'
+export type CapsuleFormField =
+  | 'title'
+  | 'text'
+  | 'scheduleDate'
+  | 'contributionDeadline'
+  | 'recipientEmail'
 
 export type CapsuleFormErrors = Partial<Record<CapsuleFormField, string>>
 
@@ -42,6 +48,14 @@ export function getMinScheduleDate(now = new Date()): Date {
   return min
 }
 
+/** Primeiro instante aceito para o prazo de contribuições: o minuto seguinte. */
+export function getMinContributionDeadline(now = new Date()): Date {
+  const min = new Date(now)
+  min.setSeconds(0, 0)
+  min.setMinutes(min.getMinutes() + 1)
+  return min
+}
+
 export function validateScheduleDate(value: string, now = new Date()): string | undefined {
   if (!value) return 'Escolha a data de entrega.'
 
@@ -50,6 +64,24 @@ export function validateScheduleDate(value: string, now = new Date()): string | 
   if (date.getTime() < now.getTime() + MIN_SCHEDULE_LEAD_MS) {
     return 'A data de entrega precisa estar no futuro.'
   }
+
+  return undefined
+}
+
+export function validateContributionDeadline(
+  value: string,
+  scheduleDate: string,
+  now = new Date(),
+): string | undefined {
+  if (!value) return 'Escolha o prazo para contribuições.'
+
+  const deadline = new Date(value).getTime()
+  if (Number.isNaN(deadline)) return 'Data inválida.'
+  if (deadline <= now.getTime()) return 'O prazo para contribuições precisa estar no futuro.'
+
+  // Data de entrega vazia ou inválida já é sinalizada no próprio campo.
+  const schedule = new Date(scheduleDate).getTime()
+  if (deadline >= schedule) return 'O prazo para contribuições precisa ser antes da data de entrega.'
 
   return undefined
 }
@@ -74,6 +106,15 @@ export function validateCapsuleForm(
 
   const scheduleError = validateScheduleDate(values.scheduleDate, now)
   if (scheduleError) errors.scheduleDate = scheduleError
+
+  if (values.type === 'GROUP') {
+    const deadlineError = validateContributionDeadline(
+      values.contributionDeadline,
+      values.scheduleDate,
+      now,
+    )
+    if (deadlineError) errors.contributionDeadline = deadlineError
+  }
 
   if (values.recipientMode === 'other') {
     const email = values.recipientEmail.trim()
