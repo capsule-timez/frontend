@@ -285,7 +285,69 @@ describe('NovaCapsulaPage: group capsule option', () => {
       return screen.findByRole('heading', { name: 'Cápsula em grupo criada!' })
     }
 
-    it('sends type and contributionDeadline in UTC', async () => {
+    function pickImages(...names: string[]) {
+      fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, {
+        target: { files: names.map((name) => new File(['x'], name, { type: 'image/png' })) },
+      })
+    }
+
+    it('replaces the recipient choice with delivery to all participants', () => {
+      renderPage()
+
+      expect(screen.getByRole('radio', { name: /Para mim/ })).toBeInTheDocument()
+
+      chooseGroup()
+
+      expect(screen.queryByRole('radio', { name: /Para mim/ })).not.toBeInTheDocument()
+      expect(screen.queryByRole('radio', { name: /Para outra pessoa/ })).not.toBeInTheDocument()
+      expect(screen.getByText('todos os participantes')).toBeInTheDocument()
+    })
+
+    it('ignores an invalid e-mail typed before switching to group', async () => {
+      createCapsuleMock.mockResolvedValue(group())
+      renderPage()
+
+      fireEvent.click(screen.getByRole('radio', { name: /Para outra pessoa/ }))
+      change('E-mail do destinatário', 'invalido')
+      await createGroup()
+
+      expect(createCapsuleMock.mock.calls[0][0]).not.toHaveProperty('recipientEmail')
+    })
+
+    it('allows only 1 image', () => {
+      renderPage()
+
+      chooseGroup()
+      pickImages('um.png', 'dois.png')
+
+      expect(screen.getByRole('img', { name: 'Miniatura de um.png' })).toBeInTheDocument()
+      expect(screen.queryByRole('img', { name: 'Miniatura de dois.png' })).not.toBeInTheDocument()
+      expect(screen.getByText(/“dois.png” não foi adicionada: o limite é de 1 imagem\./)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Escolher imagens' })).toBeDisabled()
+    })
+
+    it('keeps only the first image when switching to group, and warns about it', () => {
+      renderPage()
+
+      pickImages('um.png', 'dois.png', 'tres.png')
+      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(3)
+
+      chooseGroup()
+
+      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(1)
+      expect(screen.getByRole('img', { name: 'Miniatura de um.png' })).toBeInTheDocument()
+      expect(screen.getByText('Em grupo, cada pessoa anexa 1 imagem')).toBeInTheDocument()
+    })
+
+    it('keeps up to 5 images on an individual capsule', () => {
+      renderPage()
+
+      pickImages('um.png', 'dois.png', 'tres.png', 'quatro.png', 'cinco.png')
+
+      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(5)
+    })
+
+    it('sends type and contributionDeadline in UTC, without a recipient', async () => {
       createCapsuleMock.mockResolvedValue(group())
       renderPage()
       const scheduleDate = daysFromNow(30)
@@ -300,7 +362,6 @@ describe('NovaCapsulaPage: group capsule option', () => {
       expect(createCapsuleMock.mock.calls[0][0]).toStrictEqual({
         title: 'Formatura',
         text: 'Mensagem',
-        recipientEmail: user.email,
         scheduleDate: new Date(scheduleDate).toISOString(),
         type: 'GROUP',
         contributionDeadline: new Date(deadline).toISOString(),
