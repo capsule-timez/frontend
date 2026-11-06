@@ -105,7 +105,7 @@ export function CapsuleCard({ capsule, index = 0 }: CapsuleCardProps) {
             <Icon name="mail" />
             <span className="sr-only">Destinatário</span>
           </dt>
-          <dd>{capsule.recipientEmail}</dd>
+          <dd>{isGroup ? 'Todos os participantes' : capsule.recipientEmail}</dd>
         </div>
         {isGroup && capsule.participants && capsule.participants.length > 0 && (
           <div className="capsule-card__meta-row">
