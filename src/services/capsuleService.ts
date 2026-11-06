@@ -2,6 +2,7 @@ import axios from 'axios'
 import type {
   ApiErrorBody,
   Capsule,
+  CapsuleContribution,
   CapsuleFile,
   CapsuleSummary,
   CreateCapsuleInput,
@@ -30,6 +31,14 @@ export async function createCapsule(input: CreateCapsuleInput): Promise<Capsule>
 
 export async function joinCapsule(inviteCode: string): Promise<Capsule> {
   const { data } = await httpClient.post<Capsule>('/api/capsules/join', { inviteCode })
+  return data
+}
+
+export async function contributeToCapsule(id: string, text: string): Promise<CapsuleContribution> {
+  const { data } = await httpClient.post<CapsuleContribution>(
+    `/api/capsules/${encodeURIComponent(id)}/contributions`,
+    { text },
+  )
   return data
 }
 
