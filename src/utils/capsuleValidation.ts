@@ -86,6 +86,15 @@ export function validateContributionDeadline(
   return undefined
 }
 
+export function validateContributionText(value: string): string | undefined {
+  const text = value.trim()
+
+  if (!text) return 'Escreva sua mensagem.'
+  if (text.length > TEXT_MAX_LENGTH) return 'A mensagem deve ter no máximo 10.000 caracteres.'
+
+  return undefined
+}
+
 export function validateCapsuleForm(
   values: CapsuleFormValues,
   now = new Date(),
@@ -116,7 +125,7 @@ export function validateCapsuleForm(
     if (deadlineError) errors.contributionDeadline = deadlineError
   }
 
-  if (values.recipientMode === 'other') {
+  if (values.type !== 'GROUP' && values.recipientMode === 'other') {
     const email = values.recipientEmail.trim()
     if (!email) errors.recipientEmail = 'Informe o e-mail do destinatário.'
     else if (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email)) {
