@@ -1,0 +1,30 @@
+.capsule-contribution {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.capsule-contribution h2,
+.capsule-contribution p {
+  margin: 0;
+}
+
+.capsule-contribution__text {
+  white-space: pre-wrap;
+}
+
+.capsule-contribution__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.capsule-contribution__hint {
+  font-size: 0.925rem;
+  font-weight: 500;
+}
+
+.capsule-contribution__actions {
+  display: flex;
+  justify-content: flex-end;
+}
