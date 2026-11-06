@@ -15,7 +15,7 @@ import { useImageSelection } from '../hooks/useImageSelection'
 import { createCapsule, getApiErrorDetails } from '../services/capsuleService'
 import type { CapsuleType, CreateCapsuleInput } from '../types/capsule'
 import { formatDateTime, formatRelativeTime } from '../utils/formatDate'
-import { MAX_IMAGES_PER_CAPSULE } from '../utils/imageValidation'
+import { MAX_IMAGES_PER_CAPSULE, MAX_IMAGES_PER_PARTICIPANT } from '../utils/imageValidation'
 import {
   TEXT_MAX_LENGTH,
   TITLE_MAX_LENGTH,
@@ -61,7 +61,7 @@ const FIELD_IDS: Record<CapsuleFormField, string> = {
 const CAPSULE_TYPE_OPTIONS: { type: CapsuleType; label: string; description: string; icon: IconName }[] =
   [
     { type: 'INDIVIDUAL', label: 'Individual', description: 'Só você escreve', icon: 'user' },
-    { type: 'GROUP', label: 'Em grupo', description: 'Convide pessoas com um código', icon: 'users' },
+    { type: 'GROUP', label: 'Em grupo', description: 'Cada pessoa deixa um texto e uma imagem', icon: 'users' },
   ]
 
 /** Datas vazias não são sinalizadas enquanto o usuário preenche, só no envio. */
@@ -78,14 +78,14 @@ function toCreateInput(values: CapsuleFormValues, recipientEmail: string): Creat
   const input: CreateCapsuleInput = {
     title: values.title.trim(),
     text: values.text.trim(),
-    recipientEmail,
     scheduleDate: new Date(values.scheduleDate).toISOString(),
   }
 
   // Cápsula individual segue sem os campos de grupo: a API atual rejeita campos
   // desconhecidos, e enviá-los quebraria a criação antes do backend de grupo existir.
-  if (values.type !== 'GROUP') return input
+  if (values.type !== 'GROUP') return { ...input, recipientEmail }
 
+  // Sem `recipientEmail`: a entrega vai para o e-mail de todos os participantes.
   return {
     ...input,
     type: 'GROUP',
@@ -116,7 +116,9 @@ export function NovaCapsulaPage() {
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [createdGroup, setCreatedGroup] = useState<{ id: string; inviteCode: string } | null>(null)
-  const images = useImageSelection(MAX_IMAGES_PER_CAPSULE)
+  const isGroup = values.type === 'GROUP'
+  const maxImages = isGroup ? MAX_IMAGES_PER_PARTICIPANT : MAX_IMAGES_PER_CAPSULE
+  const images = useImageSelection(maxImages)
 
   const minScheduleDate = toDateTimeLocalValue(getMinScheduleDate())
   const minContributionDeadline = toDateTimeLocalValue(getMinContributionDeadline())
@@ -150,7 +152,13 @@ export function NovaCapsulaPage() {
 
   function handleTypeChange(type: CapsuleType) {
     setValues((current) => ({ ...current, type, contributionDeadline: '' }))
-    setErrors((current) => ({ ...current, contributionDeadline: undefined }))
+    setErrors((current) => ({ ...current, contributionDeadline: undefined, recipientEmail: undefined }))
+
+    const extras = type === 'GROUP' ? images.items.slice(MAX_IMAGES_PER_PARTICIPANT) : []
+    if (extras.length > 0) {
+      for (const extra of extras) images.remove(extra.key)
+      toast.info('Em grupo, cada pessoa anexa 1 imagem', { description: 'Mantivemos só a primeira.' })
+    }
   }
 
   function handleRecipientModeChange(mode: RecipientMode) {
@@ -234,8 +242,9 @@ export function NovaCapsulaPage() {
         <Card className="nova-capsula__created">
           <InviteCode code={createdGroup.inviteCode} />
           <p className="nova-capsula__created-hint">
-            Quem receber o código entra pela opção “Entrar com código” em Minhas cápsulas. O código
-            continua disponível no detalhe da cápsula.
+            Quem receber o código entra pela opção “Entrar com código” em Minhas cápsulas e pode
+            deixar 1 texto e 1 imagem até o prazo. Na data de entrega, a cápsula chega no e-mail de
+            todos os participantes. O código continua disponível no detalhe da cápsula.
           </p>
           <div className="nova-capsula__actions">
             <ButtonLink to="/capsulas" variant="ghost">
@@ -346,11 +355,11 @@ export function NovaCapsulaPage() {
               </span>
             </p>
           )}
-          {values.type === 'GROUP' && (
+          {isGroup && (
             <FormField
               {...fieldProps('contributionDeadline')}
               label="Prazo para contribuições"
-              hint="Depois desse prazo, ninguém mais entra na cápsula com o código de convite."
+              hint="Depois desse prazo, ninguém mais entra na cápsula nem envia contribuições."
               type="datetime-local"
               min={minContributionDeadline}
               max={values.scheduleDate || undefined}
@@ -365,54 +374,65 @@ export function NovaCapsulaPage() {
             <span className="nova-capsula__step-number">4</span>
             Para quem?
           </legend>
-          <div className="nova-capsula__options">
-            {RECIPIENT_OPTIONS.map((option) => (
-              <label key={option.mode} className="nova-capsula__option">
-                <input
-                  type="radio"
-                  name="recipientMode"
-                  value={option.mode}
-                  checked={values.recipientMode === option.mode}
-                  onChange={() => handleRecipientModeChange(option.mode)}
-                />
-                <span className="nova-capsula__option-icon">
-                  <Icon name={option.icon} size={20} />
-                </span>
-                <span>
-                  <span className="nova-capsula__option-label">{option.label}</span>
-                  <span className="nova-capsula__option-description">{option.description}</span>
-                </span>
-              </label>
-            ))}
-          </div>
-
-          {values.recipientMode === 'self' ? (
+          {isGroup ? (
             <p className="nova-capsula__self">
               <Icon name="mail" size={16} />
-              Será entregue em <strong>{user?.email}</strong>
+              <span>
+                Será entregue no e-mail de <strong>todos os participantes</strong>, incluindo você.
+              </span>
             </p>
           ) : (
-            <FormField
-              {...fieldProps('recipientEmail')}
-              label="E-mail do destinatário"
-              type="email"
-              autoComplete="email"
-              value={values.recipientEmail}
-              onChange={handleChange}
-              placeholder="pessoa@exemplo.com"
-            />
+            <>
+              <div className="nova-capsula__options">
+                {RECIPIENT_OPTIONS.map((option) => (
+                  <label key={option.mode} className="nova-capsula__option">
+                    <input
+                      type="radio"
+                      name="recipientMode"
+                      value={option.mode}
+                      checked={values.recipientMode === option.mode}
+                      onChange={() => handleRecipientModeChange(option.mode)}
+                    />
+                    <span className="nova-capsula__option-icon">
+                      <Icon name={option.icon} size={20} />
+                    </span>
+                    <span>
+                      <span className="nova-capsula__option-label">{option.label}</span>
+                      <span className="nova-capsula__option-description">{option.description}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+
+              {values.recipientMode === 'self' ? (
+                <p className="nova-capsula__self">
+                  <Icon name="mail" size={16} />
+                  Será entregue em <strong>{user?.email}</strong>
+                </p>
+              ) : (
+                <FormField
+                  {...fieldProps('recipientEmail')}
+                  label="E-mail do destinatário"
+                  type="email"
+                  autoComplete="email"
+                  value={values.recipientEmail}
+                  onChange={handleChange}
+                  placeholder="pessoa@exemplo.com"
+                />
+              )}
+            </>
           )}
         </fieldset>
 
         <fieldset className="nova-capsula__step">
           <legend className="nova-capsula__step-title">
             <span className="nova-capsula__step-number">5</span>
-            Imagens (opcional)
+            {isGroup ? 'Sua imagem (opcional)' : 'Imagens (opcional)'}
           </legend>
           <ImagePicker
             items={images.items}
             rejections={images.rejections}
-            maxFiles={MAX_IMAGES_PER_CAPSULE}
+            maxFiles={maxImages}
             disabled={isSubmitting}
             onAdd={images.add}
             onRemove={images.remove}
