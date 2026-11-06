@@ -112,6 +112,8 @@ describe('group capsules in the list and detail', () => {
       expect(groupCard.getByText('Grupo')).toBeInTheDocument()
       expect(groupCard.getByText('Participantes')).toBeInTheDocument()
       expect(groupCard.getByText('Ana Lima, Bruno Reis')).toBeInTheDocument()
+      expect(groupCard.getByText('Todos os participantes')).toBeInTheDocument()
+      expect(groupCard.queryByText(group.recipientEmail as string)).not.toBeInTheDocument()
 
       const individualCard = within(card('Carta para mim'))
       expect(individualCard.queryByText('Grupo')).not.toBeInTheDocument()
@@ -146,6 +148,8 @@ describe('group capsules in the list and detail', () => {
       await renderDetail(group)
 
       expect(screen.getByText('Grupo')).toBeInTheDocument()
+      expect(screen.getByText('Destinatários')).toBeInTheDocument()
+      expect(screen.getByText('Todos os participantes')).toBeInTheDocument()
       expect(screen.getByText('Prazo para contribuições')).toBeInTheDocument()
       expect(document.querySelector(`time[datetime="${group.contributionDeadline}"]`)).toBeInTheDocument()
 
