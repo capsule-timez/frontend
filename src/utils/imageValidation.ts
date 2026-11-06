@@ -1,4 +1,6 @@
 export const MAX_IMAGES_PER_CAPSULE = 5
+/** Em cápsula em grupo, cada pessoa deixa 1 texto e 1 imagem. */
+export const MAX_IMAGES_PER_PARTICIPANT = 1
 export const MAX_IMAGE_SIZE_BYTES = 10 * 1024 * 1024
 export const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
