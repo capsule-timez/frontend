@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { createCapsule, getApiErrorDetails, joinCapsule } from '../src/services/capsuleService'
+import { contributeToCapsule, createCapsule, getApiErrorDetails, joinCapsule } from '../src/services/capsuleService'
 import { httpClient, setAuthTokenGetter } from '../src/services/httpClient'
 
 const capsule = { id: 'capsule-1', title: 'Turma', type: 'GROUP', inviteCode: 'ABC123' }
@@ -48,7 +48,6 @@ describe('group capsule requests', () => {
     const input = {
       title: 'Turma',
       text: 'Mensagem',
-      recipientEmail: 'turma@example.com',
       scheduleDate: '2026-12-31T12:00:00.000Z',
       type: 'GROUP' as const,
       contributionDeadline: '2026-12-01T12:00:00.000Z',
@@ -59,6 +58,15 @@ describe('group capsule requests', () => {
     expect(requests[0].method).toBe('post')
     expect(requests[0].url).toBe('/api/capsules')
     expect(JSON.parse(requests[0].data as string)).toEqual(input)
+  })
+
+  it('sends a contribution through POST /api/capsules/:id/contributions', async () => {
+    await contributeToCapsule('capsule/1', 'Minha mensagem')
+
+    expect(requests[0].method).toBe('post')
+    expect(requests[0].url).toBe('/api/capsules/capsule%2F1/contributions')
+    expect(JSON.parse(requests[0].data as string)).toEqual({ text: 'Minha mensagem' })
+    expect(requests[0].headers.get('Authorization')).toBe('Bearer session-token')
   })
 
   it('propagates a join failure', async () => {
