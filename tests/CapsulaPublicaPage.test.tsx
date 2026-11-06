@@ -89,6 +89,27 @@ describe('CapsulaPublicaPage (/c/:token)', () => {
     expect(screen.queryByRole('heading', { name: /entrar/i })).not.toBeInTheDocument()
   })
 
+  it('shows the text and image of each participant of a group capsule', async () => {
+    getPublicCapsuleMock.mockResolvedValue({
+      ...capsule,
+      files: [],
+      contributions: [
+        { id: 'c1', authorName: 'Ana Lima', text: 'Texto da Ana', file: capsule.files[0] },
+        { id: 'c2', authorName: 'Bruno Reis', text: 'Texto do Bruno', file: null },
+      ],
+    })
+
+    renderAt('/c/tk_abc123')
+
+    expect(await screen.findByRole('heading', { level: 2, name: 'Ana Lima' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Bruno Reis' })).toBeInTheDocument()
+    expect(screen.getByText('Texto da Ana')).toBeInTheDocument()
+    expect(screen.getByText('Texto do Bruno')).toBeInTheDocument()
+    expect(screen.getAllByRole('img')).toHaveLength(1)
+    expect(screen.getByRole('img', { name: 'foto-turma.jpg' })).toHaveAttribute('src', capsule.files[0].downloadUrl)
+    expect(screen.queryByRole('heading', { name: 'Mensagem' })).not.toBeInTheDocument()
+  })
+
   it('renders the attached images from downloadUrl', async () => {
     getPublicCapsuleMock.mockResolvedValue(capsule)
 
