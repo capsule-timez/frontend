@@ -6,6 +6,7 @@ export interface CapsuleParticipant {
   id: string
   name: string
   isCreator: boolean
+  hasContributed?: boolean
 }
 
 export interface CapsuleFile {
@@ -18,11 +19,21 @@ export interface CapsuleFile {
   downloadUrlExpiresAt: string
 }
 
+export interface CapsuleContribution {
+  id: string
+  text: string
+  file: CapsuleFile | null
+}
+
+export interface PublicContribution extends CapsuleContribution {
+  authorName: string
+}
+
 export interface Capsule {
   id: string
   title: string
   text: string
-  recipientEmail: string
+  recipientEmail: string | null
   scheduleDate: string
   status: CapsuleStatus
   sentAt: string | null
@@ -33,6 +44,7 @@ export interface Capsule {
   contributionDeadline?: string | null
   inviteCode?: string | null
   participants?: CapsuleParticipant[]
+  myContribution?: CapsuleContribution | null
 }
 
 export interface PublicCapsule {
@@ -40,16 +52,17 @@ export interface PublicCapsule {
   text: string
   creatorName: string
   sentAt: string
+  contributions?: PublicContribution[]
   files: CapsuleFile[]
 }
 
 /** Item da listagem: sem `text` e `files`, com a contagem de anexos. */
-export type CapsuleSummary = Omit<Capsule, 'text' | 'files' | 'inviteCode'> & { fileCount: number }
+export type CapsuleSummary = Omit<Capsule, 'text' | 'files' | 'inviteCode' | 'myContribution'> & { fileCount: number }
 
 export interface CreateCapsuleInput {
   title: string
   text: string
-  recipientEmail: string
+  recipientEmail?: string
   /** ISO 8601 em UTC com sufixo Z. */
   scheduleDate: string
   type?: CapsuleType
