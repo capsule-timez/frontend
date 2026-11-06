@@ -2,23 +2,28 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Alert } from '../components/Alert/Alert'
 import { Button, ButtonLink } from '../components/Button/Button'
+import { Card } from '../components/Card/Card'
 import { FormField } from '../components/FormField/FormField'
 import { TextAreaField } from '../components/FormField/TextAreaField'
 import { Icon, type IconName } from '../components/Icon/Icon'
 import { ImagePicker } from '../components/ImagePicker/ImagePicker'
+import { InviteCode } from '../components/InviteCode/InviteCode'
 import { PageHeader } from '../components/PageHeader/PageHeader'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useImageSelection } from '../hooks/useImageSelection'
 import { createCapsule, getApiErrorDetails } from '../services/capsuleService'
+import type { CapsuleType, CreateCapsuleInput } from '../types/capsule'
 import { formatDateTime, formatRelativeTime } from '../utils/formatDate'
 import { MAX_IMAGES_PER_CAPSULE } from '../utils/imageValidation'
 import {
   TEXT_MAX_LENGTH,
   TITLE_MAX_LENGTH,
+  getMinContributionDeadline,
   getMinScheduleDate,
   toDateTimeLocalValue,
   validateCapsuleForm,
+  validateContributionDeadline,
   validateScheduleDate,
   type CapsuleFormErrors,
   type CapsuleFormField,
@@ -28,20 +33,64 @@ import {
 import './NovaCapsulaPage.css'
 
 const INITIAL_VALUES: CapsuleFormValues = {
+  type: 'INDIVIDUAL',
   title: '',
   text: '',
   scheduleDate: '',
+  contributionDeadline: '',
   recipientMode: 'self',
   recipientEmail: '',
 }
 
-const FIELD_ORDER: CapsuleFormField[] = ['title', 'text', 'scheduleDate', 'recipientEmail']
+const FIELD_ORDER: CapsuleFormField[] = [
+  'title',
+  'text',
+  'scheduleDate',
+  'contributionDeadline',
+  'recipientEmail',
+]
 
 const FIELD_IDS: Record<CapsuleFormField, string> = {
   title: 'capsule-title',
   text: 'capsule-text',
   scheduleDate: 'capsule-schedule-date',
+  contributionDeadline: 'capsule-contribution-deadline',
   recipientEmail: 'capsule-recipient-email',
+}
+
+const CAPSULE_TYPE_OPTIONS: { type: CapsuleType; label: string; description: string; icon: IconName }[] =
+  [
+    { type: 'INDIVIDUAL', label: 'Individual', description: 'Só você escreve', icon: 'user' },
+    { type: 'GROUP', label: 'Em grupo', description: 'Convide pessoas com um código', icon: 'users' },
+  ]
+
+/** Datas vazias não são sinalizadas enquanto o usuário preenche, só no envio. */
+function validateDates({ scheduleDate, contributionDeadline }: CapsuleFormValues): CapsuleFormErrors {
+  return {
+    scheduleDate: scheduleDate ? validateScheduleDate(scheduleDate) : undefined,
+    contributionDeadline: contributionDeadline
+      ? validateContributionDeadline(contributionDeadline, scheduleDate)
+      : undefined,
+  }
+}
+
+function toCreateInput(values: CapsuleFormValues, recipientEmail: string): CreateCapsuleInput {
+  const input: CreateCapsuleInput = {
+    title: values.title.trim(),
+    text: values.text.trim(),
+    recipientEmail,
+    scheduleDate: new Date(values.scheduleDate).toISOString(),
+  }
+
+  // Cápsula individual segue sem os campos de grupo: a API atual rejeita campos
+  // desconhecidos, e enviá-los quebraria a criação antes do backend de grupo existir.
+  if (values.type !== 'GROUP') return input
+
+  return {
+    ...input,
+    type: 'GROUP',
+    contributionDeadline: new Date(values.contributionDeadline).toISOString(),
+  }
 }
 
 /** Atalhos de data: a maioria das cápsulas é "daqui a um tempo", não uma data exata. */
@@ -66,9 +115,11 @@ export function NovaCapsulaPage() {
   const [errors, setErrors] = useState<CapsuleFormErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [createdGroup, setCreatedGroup] = useState<{ id: string; inviteCode: string } | null>(null)
   const images = useImageSelection(MAX_IMAGES_PER_CAPSULE)
 
   const minScheduleDate = toDateTimeLocalValue(getMinScheduleDate())
+  const minContributionDeadline = toDateTimeLocalValue(getMinContributionDeadline())
   const scheduleIso =
     values.scheduleDate && !errors.scheduleDate && !validateScheduleDate(values.scheduleDate)
       ? new Date(values.scheduleDate).toISOString()
@@ -80,12 +131,8 @@ export function NovaCapsulaPage() {
 
     setValues((current) => ({ ...current, [field]: value }))
 
-    if (field === 'scheduleDate') {
-      // Data no passado é sinalizada assim que escolhida, sem esperar o envio.
-      setErrors((current) => ({
-        ...current,
-        scheduleDate: value ? validateScheduleDate(value) : undefined,
-      }))
+    if (field === 'scheduleDate' || field === 'contributionDeadline') {
+      setErrors((current) => ({ ...current, ...validateDates({ ...values, [field]: value }) }))
     } else if (field in errors) {
       setErrors((current) => ({ ...current, [field]: undefined }))
     }
@@ -98,7 +145,12 @@ export function NovaCapsulaPage() {
 
     const value = toDateTimeLocalValue(date)
     setValues((current) => ({ ...current, scheduleDate: value }))
-    setErrors((current) => ({ ...current, scheduleDate: validateScheduleDate(value) }))
+    setErrors((current) => ({ ...current, ...validateDates({ ...values, scheduleDate: value }) }))
+  }
+
+  function handleTypeChange(type: CapsuleType) {
+    setValues((current) => ({ ...current, type, contributionDeadline: '' }))
+    setErrors((current) => ({ ...current, contributionDeadline: undefined }))
   }
 
   function handleRecipientModeChange(mode: RecipientMode) {
@@ -127,33 +179,30 @@ export function NovaCapsulaPage() {
 
     setIsSubmitting(true)
     try {
-      const capsule = await createCapsule({
-        title: values.title.trim(),
-        text: values.text.trim(),
-        recipientEmail,
-        scheduleDate: new Date(values.scheduleDate).toISOString(),
-      })
-      // A cápsula já existe; falha em imagens não a desfaz, o usuário reenvia pelo detalhe.
+      const capsule = await createCapsule(toCreateInput(values, recipientEmail))
       const uploads = images.items.length > 0 ? await images.upload(capsule.id) : { sent: 0, failed: 0 }
       if (uploads.failed > 0) {
         toast.error('Cápsula criada, mas algumas imagens não foram enviadas', {
           description: 'Abra a cápsula para tentar enviar as imagens novamente.',
         })
-        navigate(`/capsulas/${capsule.id}`)
+      } else {
+        toast.success('Cápsula agendada!', {
+          description: `“${capsule.title}” será entregue ${formatRelativeTime(capsule.scheduleDate)}.`,
+        })
+      }
+      if (values.type === 'GROUP' && capsule.inviteCode) {
+        setCreatedGroup({ id: capsule.id, inviteCode: capsule.inviteCode })
         return
       }
-      toast.success('Cápsula agendada!', {
-        description: `“${capsule.title}” será entregue ${formatRelativeTime(capsule.scheduleDate)}.`,
-      })
-      navigate('/capsulas')
+      navigate(uploads.failed > 0 ? `/capsulas/${capsule.id}` : '/capsulas')
     } catch (error) {
       const details = getApiErrorDetails(error)
+      const apiErrors: CapsuleFormErrors = {}
+      for (const field of FIELD_ORDER) {
+        if (details.fieldErrors[field]) apiErrors[field] = details.fieldErrors[field]
+      }
 
-      if (details.code === 'VALIDATION_ERROR' && Object.keys(details.fieldErrors).length > 0) {
-        const apiErrors: CapsuleFormErrors = {}
-        for (const field of FIELD_ORDER) {
-          if (details.fieldErrors[field]) apiErrors[field] = details.fieldErrors[field]
-        }
+      if (details.code === 'VALIDATION_ERROR' && Object.keys(apiErrors).length > 0) {
         setErrors(apiErrors)
         focusFirstError(apiErrors)
         setFormError('Revise os campos destacados.')
@@ -175,6 +224,30 @@ export function NovaCapsulaPage() {
     }
   }
 
+  if (createdGroup) {
+    return (
+      <section className="nova-capsula page-enter">
+        <PageHeader
+          title="Cápsula em grupo criada!"
+          description="Compartilhe o código de convite com quem vai participar."
+        />
+        <Card className="nova-capsula__created">
+          <InviteCode code={createdGroup.inviteCode} />
+          <p className="nova-capsula__created-hint">
+            Quem receber o código entra pela opção “Entrar com código” em Minhas cápsulas. O código
+            continua disponível no detalhe da cápsula.
+          </p>
+          <div className="nova-capsula__actions">
+            <ButtonLink to="/capsulas" variant="ghost">
+              Minhas cápsulas
+            </ButtonLink>
+            <ButtonLink to={`/capsulas/${encodeURIComponent(createdGroup.id)}`}>Ver cápsula</ButtonLink>
+          </div>
+        </Card>
+      </section>
+    )
+  }
+
   return (
     <section className="nova-capsula page-enter">
       <PageHeader
@@ -188,6 +261,33 @@ export function NovaCapsulaPage() {
         <fieldset className="nova-capsula__step">
           <legend className="nova-capsula__step-title">
             <span className="nova-capsula__step-number">1</span>
+            Individual ou em grupo?
+          </legend>
+          <div className="nova-capsula__options">
+            {CAPSULE_TYPE_OPTIONS.map((option) => (
+              <label key={option.type} className="nova-capsula__option">
+                <input
+                  type="radio"
+                  name="capsuleType"
+                  value={option.type}
+                  checked={values.type === option.type}
+                  onChange={() => handleTypeChange(option.type)}
+                />
+                <span className="nova-capsula__option-icon">
+                  <Icon name={option.icon} size={20} />
+                </span>
+                <span>
+                  <span className="nova-capsula__option-label">{option.label}</span>
+                  <span className="nova-capsula__option-description">{option.description}</span>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        <fieldset className="nova-capsula__step">
+          <legend className="nova-capsula__step-title">
+            <span className="nova-capsula__step-number">2</span>
             Escreva a mensagem
           </legend>
           <FormField
@@ -214,7 +314,7 @@ export function NovaCapsulaPage() {
 
         <fieldset className="nova-capsula__step nova-capsula__step--highlight">
           <legend className="nova-capsula__step-title">
-            <span className="nova-capsula__step-number">2</span>
+            <span className="nova-capsula__step-number">3</span>
             Quando entregar?
           </legend>
           <div className="nova-capsula__presets" role="group" aria-label="Atalhos de data">
@@ -246,11 +346,23 @@ export function NovaCapsulaPage() {
               </span>
             </p>
           )}
+          {values.type === 'GROUP' && (
+            <FormField
+              {...fieldProps('contributionDeadline')}
+              label="Prazo para contribuições"
+              hint="Depois desse prazo, ninguém mais entra na cápsula com o código de convite."
+              type="datetime-local"
+              min={minContributionDeadline}
+              max={values.scheduleDate || undefined}
+              value={values.contributionDeadline}
+              onChange={handleChange}
+            />
+          )}
         </fieldset>
 
         <fieldset className="nova-capsula__step">
           <legend className="nova-capsula__step-title">
-            <span className="nova-capsula__step-number">3</span>
+            <span className="nova-capsula__step-number">4</span>
             Para quem?
           </legend>
           <div className="nova-capsula__options">
@@ -294,7 +406,7 @@ export function NovaCapsulaPage() {
 
         <fieldset className="nova-capsula__step">
           <legend className="nova-capsula__step-title">
-            <span className="nova-capsula__step-number">4</span>
+            <span className="nova-capsula__step-number">5</span>
             Imagens (opcional)
           </legend>
           <ImagePicker
