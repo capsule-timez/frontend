@@ -68,6 +68,22 @@
   border: var(--stroke-thin);
 }
 
+.capsula-detalhe__participants {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capsula-detalhe__participants li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  font-weight: 500;
+}
+
 .capsula-detalhe__upload {
   display: flex;
   justify-content: flex-end;
