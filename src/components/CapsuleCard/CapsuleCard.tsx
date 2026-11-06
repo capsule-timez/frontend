@@ -1,7 +1,9 @@
 import type { CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
 import type { CapsuleStatus, CapsuleSummary } from '../../types/capsule'
+import { formatParticipantNames, isGroupCapsule } from '../../utils/capsuleGroup'
 import { formatDateTime, formatRelativeTime, isInFuture } from '../../utils/formatDate'
+import { Badge } from '../Badge/Badge'
 import { Card } from '../Card/Card'
 import { CapsuleStatusBadge } from '../CapsuleStatusBadge/CapsuleStatusBadge'
 import { Icon, type IconName } from '../Icon/Icon'
@@ -43,6 +45,7 @@ interface CapsuleCardProps {
 
 export function CapsuleCard({ capsule, index = 0 }: CapsuleCardProps) {
   const progress = capsule.status === 'SCHEDULED' ? getDeliveryProgress(capsule) : null
+  const isGroup = isGroupCapsule(capsule)
 
   return (
     <Card
@@ -55,6 +58,7 @@ export function CapsuleCard({ capsule, index = 0 }: CapsuleCardProps) {
           <Icon name={STATUS_ICONS[capsule.status]} size={20} />
         </span>
         <CapsuleStatusBadge status={capsule.status} />
+        {isGroup && <Badge tone="info" icon="users">Grupo</Badge>}
         {capsule.fileCount > 0 && (
           <span
             className="capsule-card__files"
@@ -101,8 +105,17 @@ export function CapsuleCard({ capsule, index = 0 }: CapsuleCardProps) {
             <Icon name="mail" />
             <span className="sr-only">Destinatário</span>
           </dt>
-          <dd>{capsule.recipientEmail}</dd>
+          <dd>{isGroup ? 'Todos os participantes' : capsule.recipientEmail}</dd>
         </div>
+        {isGroup && capsule.participants && capsule.participants.length > 0 && (
+          <div className="capsule-card__meta-row">
+            <dt>
+              <Icon name="users" />
+              <span className="sr-only">Participantes</span>
+            </dt>
+            <dd>{formatParticipantNames(capsule.participants)}</dd>
+          </div>
+        )}
       </dl>
     </Card>
   )

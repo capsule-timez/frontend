@@ -40,7 +40,12 @@ export function CapsulasPage() {
         eyebrow={user ? `Olá, ${user.name.split(' ')[0]}` : 'Olá'}
         title="Suas mensagens para o futuro"
         description="Acompanhe suas cápsulas e os próximos envios."
-        actions={<ButtonLink to="/capsulas/nova" variant="dark" icon="plus">Nova cápsula</ButtonLink>}
+        actions={(
+          <>
+            <ButtonLink to="/capsulas/nova" variant="dark" icon="plus">Nova cápsula</ButtonLink>
+            <ButtonLink to="/capsulas/entrar" variant="secondary" icon="users">Entrar com código</ButtonLink>
+          </>
+        )}
       />
       <div className="capsulas__toolbar">
         <h2 className="capsulas__heading">Suas cápsulas</h2>

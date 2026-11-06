@@ -36,6 +36,10 @@
   animation-delay: 240ms;
 }
 
+.nova-capsula__step:nth-of-type(5) {
+  animation-delay: 320ms;
+}
+
 .nova-capsula__step--highlight {
   background-color: var(--color-yellow);
 }
@@ -195,4 +199,16 @@
   display: flex;
   justify-content: flex-end;
   gap: 1rem;
+}
+
+.nova-capsula__created {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  padding: 1.5rem;
+  box-shadow: var(--shadow-2);
+}
+
+.nova-capsula__created-hint {
+  margin: 0;
 }

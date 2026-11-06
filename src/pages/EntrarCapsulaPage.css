@@ -1,0 +1,27 @@
+.entrar-capsula {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.entrar-capsula > .btn {
+  align-self: flex-start;
+}
+
+.entrar-capsula__card {
+  padding: 1.5rem;
+  box-shadow: var(--shadow-2);
+}
+
+.entrar-capsula__form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.entrar-capsula__actions {
+  display: flex;
+  justify-content: flex-end;
+}

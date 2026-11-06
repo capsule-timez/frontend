@@ -28,6 +28,12 @@
   border-bottom: var(--stroke-thin);
 }
 
+.capsula-detalhe__meta:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .capsula-detalhe__meta dt {
   font-weight: 700;
   margin-bottom: 0.5rem;
@@ -66,6 +72,22 @@
   height: 6rem;
   object-fit: cover;
   border: var(--stroke-thin);
+}
+
+.capsula-detalhe__participants {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.capsula-detalhe__participants li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  font-weight: 500;
 }
 
 .capsula-detalhe__upload {

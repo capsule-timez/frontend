@@ -58,6 +58,10 @@
   margin-bottom: 0;
 }
 
+.capsula-publica__message + .capsule-image {
+  margin-top: 1rem;
+}
+
 .capsula-publica__gallery {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));

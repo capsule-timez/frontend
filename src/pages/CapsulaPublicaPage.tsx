@@ -87,10 +87,19 @@ function CapsuleContent({ capsule }: { capsule: PublicCapsule }) {
           <div><dt>Entregue em</dt><dd><time dateTime={capsule.sentAt}>{formatDateTime(capsule.sentAt)}</time></dd></div>
         </dl>
       </header>
-      <Card className="capsula-publica__content">
-        <h2>Mensagem</h2>
-        <p className="capsula-publica__message">{capsule.text}</p>
-      </Card>
+      {capsule.contributions?.map((contribution) => (
+        <Card key={contribution.id} className="capsula-publica__content">
+          <h2>{contribution.authorName}</h2>
+          <p className="capsula-publica__message">{contribution.text}</p>
+          {contribution.file && <CapsuleImage key={contribution.file.downloadUrl} file={contribution.file} />}
+        </Card>
+      ))}
+      {!capsule.contributions?.length && (
+        <Card className="capsula-publica__content">
+          <h2>Mensagem</h2>
+          <p className="capsula-publica__message">{capsule.text}</p>
+        </Card>
+      )}
       {images.length > 0 && (
         <Card className="capsula-publica__content">
           <h2>Imagens</h2>

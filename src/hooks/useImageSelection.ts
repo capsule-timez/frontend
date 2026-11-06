@@ -48,7 +48,7 @@ export function useImageSelection(maxFiles: number) {
         if (problem) {
           messages.push(problem)
         } else if (slots <= 0) {
-          messages.push(`“${file.name}” não foi adicionada: o limite é de ${maxFiles} imagens por cápsula.`)
+          messages.push(`“${file.name}” não foi adicionada: o limite é de ${maxFiles} ${maxFiles === 1 ? 'imagem' : 'imagens'}.`)
         } else {
           slots -= 1
           accepted.push({
