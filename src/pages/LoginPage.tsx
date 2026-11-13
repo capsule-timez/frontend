@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { AuthCard } from '../components/AuthCard/AuthCard'
 import { Alert } from '../components/Alert/Alert'
 import { Button } from '../components/Button/Button'
@@ -13,6 +13,7 @@ import type { ApiError } from '../services/apiError'
 export function LoginPage() {
   const { login } = useAuth()
   const toast = useToast()
+  const { state: navigationState } = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
@@ -24,7 +25,6 @@ export function LoginPage() {
     setIsSubmitting(true)
 
     try {
-      // Ao autenticar, o PublicOnlyRoute redireciona para a listagem.
       await login({ email, password })
       toast.success('Bem-vindo de volta!', { description: 'Suas cápsulas estão te esperando.' })
     } catch (err) {
@@ -39,7 +39,7 @@ export function LoginPage() {
       subtitle="Entre para acompanhar suas cápsulas do tempo."
       footer={
         <>
-          Ainda não tem conta? <Link to="/cadastro">Criar conta</Link>
+          Ainda não tem conta? <Link to="/cadastro" state={navigationState}>Criar conta</Link>
         </>
       }
     >

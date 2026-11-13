@@ -5,6 +5,7 @@ import { CapsulasPage } from '../pages/CapsulasPage'
 import { CapsulaDetalhePage } from '../pages/CapsulaDetalhePage'
 import { CapsulaPublicaPage } from '../pages/CapsulaPublicaPage'
 import { EntrarCapsulaPage } from '../pages/EntrarCapsulaPage'
+import { ConvitePage } from '../pages/ConvitePage'
 import { LoginPage } from '../pages/LoginPage'
 import { NovaCapsulaPage } from '../pages/NovaCapsulaPage'
 import { ProtectedRoute } from './ProtectedRoute'
@@ -21,6 +22,7 @@ export function AppRoutes() {
           <Route path="cadastro" element={<CadastroPage />} />
         </Route>
         <Route element={<ProtectedRoute />}>
+          <Route path="convite/:token" element={<ConvitePage />} />
           <Route path="capsulas" element={<CapsulasPage />} />
           <Route path="capsulas/nova" element={<NovaCapsulaPage />} />
           <Route path="capsulas/entrar" element={<EntrarCapsulaPage />} />
