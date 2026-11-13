@@ -100,3 +100,13 @@
   display: flex;
   justify-content: flex-end;
 }
+
+.capsula-detalhe__invite-form {
+  display: grid;
+  gap: 1rem;
+  justify-items: start;
+}
+
+.capsula-detalhe__invite-form > .form-field {
+  width: 100%;
+}

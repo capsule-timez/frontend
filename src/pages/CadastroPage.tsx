@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { AuthCard } from '../components/AuthCard/AuthCard'
 import { Alert } from '../components/Alert/Alert'
 import { Button } from '../components/Button/Button'
@@ -13,6 +13,7 @@ import type { ApiError } from '../services/apiError'
 export function CadastroPage() {
   const { register } = useAuth()
   const toast = useToast()
+  const { state: navigationState } = useLocation()
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -25,7 +26,6 @@ export function CadastroPage() {
     setIsSubmitting(true)
 
     try {
-      // Cria a conta e autentica; o PublicOnlyRoute redireciona para a listagem.
       await register({ name, email, password })
       toast.success('Conta criada com sucesso!', { description: 'Que tal escrever sua primeira cápsula?' })
     } catch (err) {
@@ -40,7 +40,7 @@ export function CadastroPage() {
       subtitle="Escreva hoje, receba no futuro."
       footer={
         <>
-          Já tem conta? <Link to="/login">Fazer login</Link>
+          Já tem conta? <Link to="/login" state={navigationState}>Fazer login</Link>
         </>
       }
     >
