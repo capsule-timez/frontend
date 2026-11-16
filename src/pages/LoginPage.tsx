@@ -9,11 +9,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { getApiError } from '../services/apiError'
 import type { ApiError } from '../services/apiError'
+import { getInviteReturnPath } from '../utils/inviteReturn'
 
 export function LoginPage() {
   const { login } = useAuth()
   const toast = useToast()
   const { state: navigationState } = useLocation()
+  const fromInvite = getInviteReturnPath(navigationState) !== null
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<ApiError | null>(null)
@@ -26,7 +28,9 @@ export function LoginPage() {
 
     try {
       await login({ email, password })
-      toast.success('Bem-vindo de volta!', { description: 'Suas cápsulas estão te esperando.' })
+      toast.success('Bem-vindo de volta!', {
+        description: fromInvite ? 'Agora vamos aceitar o seu convite.' : 'Suas cápsulas estão te esperando.',
+      })
     } catch (err) {
       setError(getApiError(err))
       setIsSubmitting(false)
@@ -36,7 +40,9 @@ export function LoginPage() {
   return (
     <AuthCard
       title="Bem-vindo de volta"
-      subtitle="Entre para acompanhar suas cápsulas do tempo."
+      subtitle={fromInvite
+        ? 'Entre para aceitar o convite para a cápsula.'
+        : 'Entre para acompanhar suas cápsulas do tempo.'}
       footer={
         <>
           Ainda não tem conta? <Link to="/cadastro" state={navigationState}>Criar conta</Link>
