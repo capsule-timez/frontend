@@ -1,6 +1,7 @@
-import { Link, NavLink, Outlet } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../contexts/ToastContext'
+import { getInviteReturnPath } from '../../utils/inviteReturn'
 import { Icon } from '../Icon/Icon'
 import { Logo } from '../Logo/Logo'
 import './Layout.css'
@@ -8,6 +9,10 @@ import './Layout.css'
 export function Layout() {
   const { isAuthenticated, user, logout } = useAuth()
   const toast = useToast()
+  const { state } = useLocation()
+  // Trocar entre login e cadastro pelo cabeçalho não pode perder o convite aberto.
+  const inviteReturn = getInviteReturnPath(state)
+  const authState = inviteReturn ? { returnTo: inviteReturn } : undefined
 
   function handleLogout() {
     const firstName = user?.name.split(' ')[0]
@@ -44,10 +49,10 @@ export function Layout() {
               </>
             ) : (
               <>
-                <NavLink to="/login" className="layout__link">
+                <NavLink to="/login" state={authState} className="layout__link">
                   Entrar
                 </NavLink>
-                <NavLink to="/cadastro" className="layout__link layout__link--cta">
+                <NavLink to="/cadastro" state={authState} className="layout__link layout__link--cta">
                   Criar conta
                 </NavLink>
               </>

@@ -5,7 +5,7 @@ import { Badge } from '../components/Badge/Badge'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { Card } from '../components/Card/Card'
 import { CapsuleContribution } from '../components/CapsuleContribution/CapsuleContribution'
-import { CapsuleInvites } from '../components/CapsuleInvites'
+import { CapsuleInvites } from '../components/CapsuleInvites/CapsuleInvites'
 import { CapsuleStatusBadge } from '../components/CapsuleStatusBadge/CapsuleStatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState/EmptyState'
@@ -150,7 +150,7 @@ function CapsulaDetalhe({ id }: { id: string }) {
               </>
             )}
           </Card>
-          {isGroupCreator && <CapsuleInvites capsuleId={state.capsule.id} />}
+          {isGroupCreator && <CapsuleInvites capsule={state.capsule} />}
           {isGroupCreator && state.capsule.inviteCode && (
             <Card className="capsula-detalhe__content">
               <h2>Convide participantes</h2>

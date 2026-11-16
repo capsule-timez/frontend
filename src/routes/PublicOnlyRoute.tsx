@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { getInviteReturnPath } from '../utils/inviteReturn'
 
 /**
  * Rotas de login e cadastro. Com sessão ativa, leva o usuário à listagem de
@@ -7,12 +8,8 @@ import { useAuth } from '../contexts/AuthContext'
  */
 export function PublicOnlyRoute() {
   const { isAuthenticated } = useAuth()
-
   const { state } = useLocation()
-  const returnTo: unknown = state?.returnTo
-  const destination = typeof returnTo === 'string' && /^\/convite\/[^/\\?#]+$/.test(returnTo)
-    ? returnTo
-    : '/capsulas'
+  const destination = getInviteReturnPath(state) ?? '/capsulas'
 
   return isAuthenticated ? <Navigate to={destination} replace /> : <Outlet />
 }
