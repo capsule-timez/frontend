@@ -9,11 +9,13 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { getApiError } from '../services/apiError'
 import type { ApiError } from '../services/apiError'
+import { getInviteReturnPath } from '../utils/inviteReturn'
 
 export function CadastroPage() {
   const { register } = useAuth()
   const toast = useToast()
   const { state: navigationState } = useLocation()
+  const fromInvite = getInviteReturnPath(navigationState) !== null
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -27,7 +29,9 @@ export function CadastroPage() {
 
     try {
       await register({ name, email, password })
-      toast.success('Conta criada com sucesso!', { description: 'Que tal escrever sua primeira cápsula?' })
+      toast.success('Conta criada com sucesso!', {
+        description: fromInvite ? 'Agora vamos aceitar o seu convite.' : 'Que tal escrever sua primeira cápsula?',
+      })
     } catch (err) {
       setError(getApiError(err))
       setIsSubmitting(false)
@@ -37,7 +41,9 @@ export function CadastroPage() {
   return (
     <AuthCard
       title="Crie sua conta"
-      subtitle="Escreva hoje, receba no futuro."
+      subtitle={fromInvite
+        ? 'Crie sua conta para aceitar o convite para a cápsula.'
+        : 'Escreva hoje, receba no futuro.'}
       footer={
         <>
           Já tem conta? <Link to="/login" state={navigationState}>Fazer login</Link>
