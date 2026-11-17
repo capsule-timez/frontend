@@ -6,6 +6,7 @@ import { AuthCard } from '../components/AuthCard/AuthCard'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { useToast } from '../contexts/ToastContext'
 import { getApiError } from '../services/apiError'
+import { getApiErrorDetails } from '../services/capsuleService'
 import { acceptInvite } from '../services/inviteService'
 
 type InviteState =
@@ -13,28 +14,25 @@ type InviteState =
   | { status: 'accepted'; capsuleId: string }
   | { status: 'error'; message: string; retryable: boolean }
 
-const FALLBACK_MESSAGES: Record<number, string> = {
-  404: 'Este convite é inválido ou não está mais disponível.',
-  409: 'Este convite já foi utilizado.',
-  410: 'Este convite expirou.',
-}
+// A API responde 404 tanto para convite inexistente quanto para já usado ou expirado.
+const NOT_FOUND_MESSAGE = 'Este convite é inválido, expirou ou já foi utilizado.'
+const DEADLINE_MESSAGE = 'O prazo para entrar nesta cápsula já terminou.'
 
 function inviteError(error: unknown): Extract<InviteState, { status: 'error' }> {
   const response = axios.isAxiosError(error) ? error.response : undefined
   const status = response?.status
 
   if (status === undefined || status >= 500) {
-    return { status: 'error', message: getApiError(error).message, retryable: true }
+    const message = error instanceof Error && !axios.isAxiosError(error) ? error.message : getApiError(error).message
+    return { status: 'error', message, retryable: true }
   }
 
-  const apiMessage: unknown = response?.data?.message
-  return {
-    status: 'error',
-    message: typeof apiMessage === 'string' && apiMessage.trim()
-      ? apiMessage
-      : FALLBACK_MESSAGES[status] ?? FALLBACK_MESSAGES[404],
-    retryable: false,
-  }
+  const { code, message } = getApiErrorDetails(error)
+  if (status === 404) return { status: 'error', message: NOT_FOUND_MESSAGE, retryable: false }
+  if (code === 'CONTRIBUTION_DEADLINE_PASSED') return { status: 'error', message: DEADLINE_MESSAGE, retryable: false }
+
+  const apiMessage = code === 'UNKNOWN' ? '' : message.trim()
+  return { status: 'error', message: apiMessage || NOT_FOUND_MESSAGE, retryable: false }
 }
 
 export function ConvitePage() {
