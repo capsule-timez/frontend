@@ -1,104 +1,75 @@
 # Cápsula em grupo na Web
 
-A criação de cápsula permite escolher entre individual e em grupo, e a rota `/capsulas/entrar` permite entrar em uma cápsula em grupo com um código de convite. Na data de entrega, a cápsula em grupo vai para o e-mail de todos os participantes, e cada pessoa, inclusive quem criou, pode deixar 1 texto e 1 imagem. A listagem e o detalhe exibem o selo **Grupo** e os participantes, e o código de convite aparece no detalhe apenas para o criador.
+A criação de cápsula permite escolher entre individual e em grupo. Na cápsula em grupo, quem cria define um prazo para contribuições e recebe um código de convite; quem tem o código entra pela rota `/capsulas/entrar` (ou por um convite por e-mail, veja [convite-por-email.md](convite-por-email.md)). Até o prazo, cada participante, inclusive quem criou, pode enviar quantas contribuições quiser, cada uma com texto, imagens ou os dois. Na data de entrega, a cápsula vai para o `recipientEmail` escolhido na criação, e a página pública mostra a mensagem de quem criou e todas as contribuições.
 
-A interface já faz as chamadas reais pelo `capsuleService`, sem dados simulados. O backend dessa funcionalidade está em desenvolvimento, então **o contrato abaixo é uma suposição** e precisa ser confirmado na integração.
+A Web segue o contrato implementado no backend (`src/services/capsule.service.ts`, `contribution.service.ts` e `publicCapsule.service.ts`), conferido também pelos testes do backend.
 
-## Regras assumidas
+## Regras da API
 
-Pontos que a regra de negócio não define e que a Web assumiu, a confirmar:
+- A cápsula em grupo exige `recipientEmail`, como a individual. A entrega vai só para esse e-mail.
+- O prazo (`contributionDeadline`) precisa estar no futuro e antes da data de entrega. Depois dele, a API recusa entrar na cápsula e contribuir com `409 CONTRIBUTION_DEADLINE_PASSED`.
+- Cada contribuição tem texto opcional de até 2.000 caracteres e até 3 imagens (JPEG, PNG ou WebP de até 10 MB). Ela precisa de texto ou de ao menos uma imagem, e não pode ser alterada depois.
+- As contribuições são visíveis para todos os participantes no detalhe.
+- Só quem criou anexa arquivos à cápsula (`POST /api/capsules/{id}/files`, até 5), exclui a cápsula e recebe o código de convite.
 
-- O anexo é uma imagem (JPEG, PNG ou WebP), os únicos tipos que `POST /api/capsules/{id}/files` aceita hoje.
-- O texto é obrigatório na contribuição e a imagem é opcional.
-- Depois de enviado, o texto não pode ser alterado. Quem enviou sem imagem ainda pode anexar uma até o prazo.
-- As contribuições ficam lacradas até a entrega: antes dela, cada pessoa vê só a própria, e a lista de participantes indica quem já contribuiu.
-- O prazo vale para entrar na cápsula e para contribuir.
-
-## Contrato esperado da API
+## Contrato usado pela Web
 
 ### `POST /api/capsules`
-
-Corpo de uma cápsula em grupo, com `type` e `contributionDeadline` e **sem** `recipientEmail`, já que a entrega vai para todos os participantes. O `text` é a contribuição do criador:
 
 ```json
 {
   "title": "Turma 2026",
   "text": "Mensagem",
+  "recipientEmail": "turma@example.com",
   "scheduleDate": "2026-12-31T12:00:00.000Z",
   "type": "GROUP",
   "contributionDeadline": "2026-12-01T12:00:00.000Z"
 }
 ```
 
-A cápsula individual continua **com** `recipientEmail` e **sem** `type` e `contributionDeadline`. O `createCapsuleSchema` atual usa `strictObject` e responde `422` a campos desconhecidos, então enviar `type: "INDIVIDUAL"` quebraria a criação individual. O backend de grupo precisa assumir `INDIVIDUAL` quando `type` não vier.
+A cápsula individual vai sem `type` e sem `contributionDeadline`. Na resposta da cápsula em grupo vêm `type`, `contributionDeadline` e `inviteCode`.
 
-### `POST /api/capsules/join`
+### `GET /api/capsules` e `GET /api/capsules/{id}`
 
-```json
-{ "inviteCode": "ABC123" }
-```
-
-A resposta precisa trazer ao menos o `id` da cápsula, usado para abrir o detalhe. Em erro (código inválido, prazo encerrado), a Web mostra a `message` da API em um toast, no formato de erro padrão do contrato. Um erro de validação em `details` com `field: "inviteCode"` também é marcado no campo.
-
-### `POST /api/capsules/{id}/contributions`
-
-Salva o texto da pessoa autenticada. Em erro, a Web mostra a `message` em um toast, e um erro de validação com `field: "text"` também é marcado no campo.
-
-```json
-{ "text": "Minha mensagem" }
-```
-
-### `POST /api/capsules/{id}/files`
-
-É o mesmo upload de hoje. Em cápsula em grupo, a imagem é a da contribuição de quem enviou, com o limite de 1 por pessoa. A Web envia o texto primeiro e a imagem depois, então uma falha na imagem não perde o texto.
-
-### Cápsula nas respostas
-
-Campos adicionais em `POST /api/capsules`, `POST /api/capsules/join`, `GET /api/capsules/{id}` e nos itens de `GET /api/capsules`, exceto onde indicado:
-
-| Campo | Tipo | Uso na Web |
-| --- | --- | --- |
-| `type` | `"INDIVIDUAL"` ou `"GROUP"` | Selo **Grupo**. Ausente é tratado como individual |
-| `contributionDeadline` | ISO 8601 em UTC ou `null` | Prazo exibido no detalhe e abertura do formulário de contribuição |
-| `inviteCode` | string ou `null` | Código exibido ao criar e no detalhe. A API deve enviá-lo só para o criador |
-| `participants` | `{ id, name, isCreator, hasContributed }[]` | Lista no detalhe, resumo no card e identificação do criador |
-| `myContribution` | `{ id, text, file }` ou `null` | Contribuição de quem está autenticado. Só no detalhe |
-| `recipientEmail` | `null` em grupo | Não é exibido em grupo; a Web mostra "Todos os participantes" |
-
-A listagem funciona sem `participants`, apenas sem o resumo de nomes. Já o detalhe depende do campo: a Web compara `participants[].id` com o usuário da sessão e `isCreator` para decidir se mostra o código de convite e o botão de excluir. Sem essa informação, o código fica oculto, mesmo que a API o envie.
-
-Em grupo, o detalhe não exibe `text` nem `files`. A API não deve enviar o conteúdo dos outros participantes antes da entrega, já que a resposta seria visível nas ferramentas do navegador. `files` continua sendo um array, mesmo vazio.
-
-### `GET /api/public/capsules/{token}`
-
-Em cápsula em grupo, a resposta traz também `contributions`, e a página pública mostra um bloco por pessoa no lugar da mensagem:
+O detalhe e a listagem **não** trazem `type` nem `contributionDeadline`. A cápsula em grupo é a que traz `participants`:
 
 ```json
 {
+  "participants": [
+    { "name": "Ana Lima", "role": "OWNER" },
+    { "name": "Bruno Reis", "role": "MEMBER" }
+  ],
   "contributions": [
-    { "id": "...", "authorName": "Ana Lima", "text": "Mensagem", "file": null }
-  ]
+    {
+      "id": "…",
+      "author": { "name": "Bruno Reis" },
+      "text": null,
+      "createdAt": "2026-11-10T12:00:00.000Z",
+      "files": [{ "id": "…", "fileName": "foto.png", "downloadUrl": "…" }]
+    }
+  ],
+  "inviteCode": "a1b2c3…"
 }
 ```
 
-## O que fica com o backend
+`contributions` só vem no detalhe, e `inviteCode` só vem para o `OWNER`. Por isso a Web considera dono da cápsula quem recebe o `inviteCode` (`src/utils/capsuleGroup.ts`).
 
-- Enviar o e-mail da entrega para todos os participantes, cada um com seu link para `/c/:token`. Hoje o job envia para um único `recipientEmail`.
-- Bloquear entrada e contribuição depois do prazo, e aplicar o limite de 1 texto e 1 imagem por pessoa. A Web só orienta o usuário; quem garante a regra é a API.
+### `POST /api/capsules/join`
 
-## Pontos de ajuste na integração
+Corpo `{ "inviteCode": "…" }`. Responde o mesmo detalhe de `GET /api/capsules/{id}`, de onde a Web tira o `id` para abrir a cápsula. Código inexistente responde `404`.
 
-Se o backend definir nomes diferentes, os ajustes ficam concentrados em:
+### `POST /api/capsules/{id}/contributions`
 
-- `src/types/capsule.ts`: formato dos campos.
-- `src/services/capsuleService.ts`: `joinCapsule` e `contributeToCapsule`, com as rotas e os nomes dos campos.
-- `src/utils/capsuleGroup.ts`: como identificar o criador.
+Só texto vai em JSON (`{ "text": "…" }`). Com imagens, a Web manda `multipart/form-data` com o campo `text` (opcional) e as imagens no campo `files`, tudo numa requisição só. A resposta é a contribuição criada, e a Web recarrega o detalhe em seguida.
 
-## Comportamento até o backend ficar pronto
+### `GET /api/public/capsules/{token}`
 
-- Cápsulas individuais funcionam normalmente.
-- Criar uma cápsula em grupo recebe `422` da API atual, e a mensagem aparece no campo de prazo.
-- Entrar com código recebe `404` da API atual, e a mensagem aparece em um toast.
+Traz `title`, `text`, `creatorName`, `sentAt` e os `files` da cápsula, mais `contributions` (no mesmo formato do detalhe) quando ela é em grupo.
+
+## Limitações atuais do backend
+
+- O detalhe não informa o prazo. A Web mostra o formulário de contribuição e o de convites enquanto a cápsula está `SCHEDULED` e os fecha quando a API responde `409 CONTRIBUTION_DEADLINE_PASSED`. Se o backend passar a enviar `contributionDeadline` no detalhe, a Web já usa esse valor para exibir o prazo e fechar os formulários.
+- Os participantes vêm só com nome e papel, sem identificador. A lista de participantes não indica quem já contribuiu.
 
 ## Validação
 
