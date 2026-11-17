@@ -153,6 +153,25 @@ describe('group capsules in the list and detail', () => {
       expect(within(items[1]).queryByText('Criador')).not.toBeInTheDocument()
     })
 
+    it('shows the deadline and who has contributed when the API sends them', async () => {
+      await renderDetail({
+        ...ownerView,
+        type: 'GROUP',
+        contributionDeadline: '2029-12-01T12:00:00.000Z',
+        participants: [
+          { name: creator.name, role: 'OWNER', hasContributed: false },
+          { name: participant.name, role: 'MEMBER', hasContributed: true },
+        ],
+      })
+
+      expect(screen.getByText('Prazo para contribuições')).toBeInTheDocument()
+      expect(document.querySelector('time[datetime="2029-12-01T12:00:00.000Z"]')).toBeInTheDocument()
+      const list = within(screen.getByRole('heading', { name: 'Participantes' }).parentElement as HTMLElement)
+      const [ana, bruno] = list.getAllByRole('listitem')
+      expect(within(ana).queryByText('Contribuiu')).not.toBeInTheDocument()
+      expect(within(bruno).getByText('Contribuiu')).toBeInTheDocument()
+    })
+
     it('shows the invite code and copies it', async () => {
       const writeText = vi.fn(async () => {})
       Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
