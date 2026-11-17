@@ -38,19 +38,26 @@ const capsule: Capsule = {
   id: 'capsule-1',
   title: 'Turma 2026',
   text: 'Mensagem',
-  recipientEmail: null,
+  recipientEmail: 'turma@example.com',
   scheduleDate: '2030-01-01T12:00:00.000Z',
   status: 'SCHEDULED',
   sentAt: null,
   createdAt: '2026-01-01T12:00:00.000Z',
   files: [],
-  type: 'GROUP',
-  contributionDeadline: '2029-12-01T12:00:00.000Z',
-  inviteCode: null,
   participants: [
-    { id: 'user-1', name: 'Ana Lima', isCreator: true },
-    { id: user.id, name: user.name, isCreator: false },
+    { name: 'Ana Lima', role: 'OWNER' },
+    { name: user.name, role: 'MEMBER' },
   ],
+  contributions: [],
+}
+
+const CODES: Record<number, string> = {
+  400: 'BAD_REQUEST',
+  403: 'FORBIDDEN',
+  404: 'NOT_FOUND',
+  409: 'CONTRIBUTION_DEADLINE_PASSED',
+  422: 'VALIDATION_ERROR',
+  500: 'INTERNAL_ERROR',
 }
 
 function apiError(status: number, message?: string) {
@@ -60,7 +67,7 @@ function apiError(status: number, message?: string) {
     statusText: '',
     headers: {},
     config,
-    data: message === undefined ? {} : { status: 'error', code: 'ERROR', message },
+    data: message === undefined ? {} : { status: 'error', code: CODES[status] ?? 'ERROR', message },
   })
 }
 
@@ -129,12 +136,11 @@ describe('ConvitePage (/convite/:token)', () => {
     })
 
     it.each([
-      [404, 'Este convite é inválido ou não está mais disponível.'],
-      [410, 'Este convite expirou.'],
-      [409, 'Este convite já foi utilizado.'],
-      [400, 'Este convite é inválido ou não está mais disponível.'],
-    ])('explains a %i response without a message', async (status, message) => {
-      acceptInviteMock.mockRejectedValue(apiError(status))
+      ['an invalid, used or expired invite (404)', apiError(404, 'Convite não encontrado.'), 'Este convite é inválido, expirou ou já foi utilizado.'],
+      ['a closed capsule (409)', apiError(409, 'O prazo de contribuição desta cápsula já passou.'), 'O prazo para entrar nesta cápsula já terminou.'],
+      ['a 4xx without a message', apiError(400), 'Este convite é inválido, expirou ou já foi utilizado.'],
+    ])('explains %s with a friendly message', async (_label, error, message) => {
+      acceptInviteMock.mockRejectedValue(error)
 
       renderAt('/convite/token-1')
 
@@ -146,12 +152,12 @@ describe('ConvitePage (/convite/:token)', () => {
       expect(getCapsuleMock).not.toHaveBeenCalled()
     })
 
-    it('prefers the API message', async () => {
-      acceptInviteMock.mockRejectedValue(apiError(403, 'Este convite foi enviado para outro e-mail.'))
+    it('uses the API message on other client errors', async () => {
+      acceptInviteMock.mockRejectedValue(apiError(403, 'Acesso negado'))
 
       renderAt('/convite/token-1')
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('Este convite foi enviado para outro e-mail.')
+      expect(await screen.findByRole('alert')).toHaveTextContent('Acesso negado')
     })
 
     it.each([
@@ -235,14 +241,14 @@ describe('ConvitePage (/convite/:token)', () => {
     })
 
     it('shows the friendly error after login when the invite is no longer valid', async () => {
-      acceptInviteMock.mockRejectedValue(apiError(410))
+      acceptInviteMock.mockRejectedValue(apiError(404, 'Convite não encontrado.'))
       renderAt('/convite/token-1')
       await screen.findByRole('heading', { name: 'Bem-vindo de volta' })
 
       fillLogin()
 
       expect(await screen.findByRole('heading', { name: 'Convite indisponível' })).toBeInTheDocument()
-      expect(screen.getByRole('alert')).toHaveTextContent('Este convite expirou.')
+      expect(screen.getByRole('alert')).toHaveTextContent('Este convite é inválido, expirou ou já foi utilizado.')
     })
 
     it('goes to the list after login from any other page', async () => {
