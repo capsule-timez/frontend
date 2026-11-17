@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { AxiosError, AxiosHeaders } from 'axios'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -6,7 +6,8 @@ import { AuthProvider } from '../src/contexts/AuthContext'
 import { ToastProvider } from '../src/contexts/ToastContext'
 import { AppRoutes } from '../src/routes/AppRoutes'
 import { contributeToCapsule, getCapsule, uploadCapsuleFile } from '../src/services/capsuleService'
-import type { Capsule, CapsuleFile } from '../src/types/capsule'
+import { listInvites } from '../src/services/inviteService'
+import type { Capsule, CapsuleContribution, CapsuleFile } from '../src/types/capsule'
 
 vi.mock('../src/services/capsuleService', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../src/services/capsuleService')>()),
@@ -15,42 +16,64 @@ vi.mock('../src/services/capsuleService', async (importOriginal) => ({
   uploadCapsuleFile: vi.fn(),
 }))
 
+vi.mock('../src/services/inviteService', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../src/services/inviteService')>()),
+  listInvites: vi.fn(),
+}))
+
 const contributeMock = vi.mocked(contributeToCapsule)
 const getCapsuleMock = vi.mocked(getCapsule)
 const uploadMock = vi.mocked(uploadCapsuleFile)
+const listInvitesMock = vi.mocked(listInvites)
 
 const DAY = 24 * 60 * 60_000
 const user = { id: 'user-2', name: 'Bruno Reis', email: 'bruno@example.com' }
 
-const file: CapsuleFile = {
-  id: 'file-1',
-  fileName: 'foto.png',
-  mimeType: 'image/png',
-  fileSize: 1024,
-  createdAt: '2026-01-01T12:00:00.000Z',
-  downloadUrl: 'http://storage.test/foto.png',
-  downloadUrlExpiresAt: '2026-01-01T13:00:00.000Z',
+function image(id: string, fileName: string): CapsuleFile {
+  return {
+    id,
+    fileName,
+    mimeType: 'image/png',
+    fileSize: 1024,
+    createdAt: '2026-01-01T12:00:00.000Z',
+    downloadUrl: `http://storage.test/${fileName}`,
+    downloadUrlExpiresAt: '2026-01-01T13:00:00.000Z',
+  }
 }
 
+const anaText: CapsuleContribution = {
+  id: 'contribution-1',
+  author: { name: 'Ana Lima' },
+  text: 'Que saudade da turma!',
+  createdAt: '2026-01-02T12:00:00.000Z',
+  files: [],
+}
+
+const brunoPhotos: CapsuleContribution = {
+  id: 'contribution-2',
+  author: { name: 'Bruno Reis' },
+  text: null,
+  createdAt: '2026-01-03T12:00:00.000Z',
+  files: [image('file-1', 'formatura.png'), image('file-2', 'viagem.png')],
+}
+
+// Mesmo formato de GET /api/capsules/:id para um MEMBER: sem type, prazo nem inviteCode.
 function capsule(overrides: Partial<Capsule> = {}): Capsule {
   return {
     id: 'capsule-1',
     title: 'Turma 2026',
-    text: 'Texto do criador, ainda lacrado',
-    recipientEmail: null,
+    text: 'Mensagem de quem criou',
+    recipientEmail: 'turma@example.com',
     scheduleDate: new Date(Date.now() + 30 * DAY).toISOString(),
     status: 'SCHEDULED',
     sentAt: null,
     createdAt: '2026-01-01T12:00:00.000Z',
     files: [],
-    type: 'GROUP',
-    contributionDeadline: new Date(Date.now() + 10 * DAY).toISOString(),
-    inviteCode: null,
     participants: [
-      { id: 'user-1', name: 'Ana Lima', isCreator: true, hasContributed: true },
-      { id: user.id, name: user.name, isCreator: false, hasContributed: false },
+      { name: 'Ana Lima', role: 'OWNER' },
+      { name: user.name, role: 'MEMBER' },
     ],
-    myContribution: null,
+    contributions: [anaText],
     ...overrides,
   }
 }
@@ -77,17 +100,25 @@ async function renderDetail(value: Capsule) {
       </AuthProvider>
     </ToastProvider>,
   )
-  await screen.findByRole('heading', { name: 'Sua contribuição' })
+  await screen.findByRole('heading', { name: 'Contribuições' })
+}
+
+function messageField() {
+  return screen.getByLabelText('Sua mensagem (opcional com imagens)')
 }
 
 function typeMessage(value: string) {
-  fireEvent.change(screen.getByLabelText('Sua mensagem'), { target: { value } })
+  fireEvent.change(messageField(), { target: { value } })
 }
 
 function pickImages(...names: string[]) {
-  fireEvent.change(document.querySelector('input[type="file"]') as HTMLInputElement, {
+  fireEvent.change(document.querySelector('.capsule-contribution input[type="file"]') as HTMLInputElement, {
     target: { files: names.map((name) => new File(['x'], name, { type: 'image/png' })) },
   })
+}
+
+function submit() {
+  fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
 }
 
 describe('group capsule contribution', () => {
@@ -97,194 +128,173 @@ describe('group capsule contribution', () => {
     contributeMock.mockReset()
     getCapsuleMock.mockReset()
     uploadMock.mockReset()
+    listInvitesMock.mockReset()
+    listInvitesMock.mockResolvedValue([])
     URL.createObjectURL = vi.fn(() => 'blob:preview')
     URL.revokeObjectURL = vi.fn()
   })
 
   afterEach(cleanup)
 
-  describe('what the detail shows', () => {
-    it('replaces the message and attachments with the personal contribution', async () => {
+  describe('what a member sees', () => {
+    it('shows the message, the recipient and the participants by role', async () => {
       await renderDetail(capsule())
 
-      expect(screen.queryByRole('heading', { name: 'Mensagem' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Anexos' })).not.toBeInTheDocument()
+      expect(screen.getByText('Mensagem de quem criou')).toBeInTheDocument()
+      expect(screen.getByText('turma@example.com')).toBeInTheDocument()
+      expect(screen.getByText('Grupo')).toBeInTheDocument()
+      const list = within(screen.getByRole('heading', { name: 'Participantes' }).parentElement as HTMLElement)
+      const [ana, bruno] = list.getAllByRole('listitem')
+      expect(within(ana).getByText('Criador')).toBeInTheDocument()
+      expect(within(bruno).queryByText('Criador')).not.toBeInTheDocument()
+    })
+
+    it('does not offer what only the owner can do', async () => {
+      await renderDetail(capsule())
+
+      expect(screen.queryByRole('heading', { name: 'Convidar por e-mail' })).not.toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Adicionar imagens' })).not.toBeInTheDocument()
-      expect(screen.queryByText('Texto do criador, ainda lacrado')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Excluir cápsula' })).not.toBeInTheDocument()
+      expect(listInvitesMock).not.toHaveBeenCalled()
     })
 
-    it('marks who has already contributed', async () => {
+    it('lists every contribution with author, text and images', async () => {
+      await renderDetail(capsule({ contributions: [anaText, brunoPhotos] }))
+
+      const list = screen.getByRole('list', { name: 'Contribuições' })
+      const [first, second] = Array.from(list.children) as HTMLElement[]
+      expect(list.children).toHaveLength(2)
+      expect(first).toHaveTextContent('Ana Lima')
+      expect(first).toHaveTextContent('Que saudade da turma!')
+      expect(second).toHaveTextContent('Bruno Reis')
+      expect(within(second).getByRole('img', { name: 'formatura.png' })).toBeInTheDocument()
+      expect(within(second).getByRole('img', { name: 'viagem.png' })).toBeInTheDocument()
+    })
+
+    it('says when nobody has contributed', async () => {
+      await renderDetail(capsule({ contributions: [] }))
+
+      expect(screen.getByText('Ninguém contribuiu ainda.')).toBeInTheDocument()
+    })
+
+    it('offers the form while the capsule is scheduled', async () => {
       await renderDetail(capsule())
 
-      const [ana, bruno] = screen.getAllByRole('listitem')
-      expect(ana).toHaveTextContent('Contribuiu')
-      expect(bruno).not.toHaveTextContent('Contribuiu')
+      expect(messageField()).toBeInTheDocument()
+      expect(screen.getByText(/até 3 imagens/)).toBeInTheDocument()
     })
 
-    it('offers the form while the deadline is open', async () => {
-      await renderDetail(capsule())
+    it('hides the form when the deadline sent by the API has passed', async () => {
+      await renderDetail(capsule({ type: 'GROUP', contributionDeadline: new Date(Date.now() - DAY).toISOString() }))
 
-      expect(screen.getByLabelText('Sua mensagem')).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Enviar contribuição' })).toBeInTheDocument()
-      expect(screen.getByText(/^0\/1 ·/)).toBeInTheDocument()
+      expect(screen.queryByLabelText('Sua mensagem (opcional com imagens)')).not.toBeInTheDocument()
+      expect(screen.getByText('O prazo para contribuições desta cápsula terminou.')).toBeInTheDocument()
     })
 
-    it.each([
-      ['the deadline has passed', { contributionDeadline: new Date(Date.now() - DAY).toISOString() }],
-      ['the capsule was already sent', { status: 'SENT' as const }],
-      ['the API sends no deadline', { contributionDeadline: null }],
-    ])('hides the form when %s', async (_label, overrides) => {
-      await renderDetail(capsule(overrides))
+    it('keeps the form while the deadline sent by the API is open', async () => {
+      await renderDetail(capsule({ type: 'GROUP', contributionDeadline: new Date(Date.now() + DAY).toISOString() }))
 
-      expect(screen.queryByLabelText('Sua mensagem')).not.toBeInTheDocument()
-      expect(screen.getByText('Você não enviou uma contribuição para esta cápsula.')).toBeInTheDocument()
+      expect(messageField()).toBeInTheDocument()
     })
 
-    it('shows a sent contribution without allowing another text', async () => {
-      await renderDetail(capsule({ myContribution: { id: 'c1', text: 'Meu texto', file } }))
+    it.each(['SENT', 'FAILED'] as const)('hides the form when the capsule is %s', async (status) => {
+      await renderDetail(capsule({ status }))
 
-      expect(screen.getByText('Meu texto')).toBeInTheDocument()
-      expect(screen.getByRole('img', { name: 'foto.png' })).toBeInTheDocument()
-      expect(screen.queryByLabelText('Sua mensagem')).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: 'Escolher imagens' })).not.toBeInTheDocument()
-    })
-
-    it('still accepts the image of a contribution sent without one', async () => {
-      await renderDetail(capsule({ myContribution: { id: 'c1', text: 'Meu texto', file: null } }))
-
-      expect(screen.queryByLabelText('Sua mensagem')).not.toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Escolher imagens' })).toBeEnabled()
-      expect(screen.queryByRole('button', { name: 'Enviar imagem' })).not.toBeInTheDocument()
+      expect(screen.queryByLabelText('Sua mensagem (opcional com imagens)')).not.toBeInTheDocument()
+      expect(screen.getByText('O prazo para contribuições desta cápsula terminou.')).toBeInTheDocument()
     })
   })
 
   describe('sending', () => {
-    it.each([
-      ['empty', ''],
-      ['blank', '   '],
-    ])('requires the text, without calling the API, when it is %s', async (_label, value) => {
+    it('sends only the text, refreshes the capsule and lets the user contribute again', async () => {
+      contributeMock.mockResolvedValue({ ...anaText, id: 'contribution-3', author: { name: user.name }, text: 'Oi, turma' })
+      await renderDetail(capsule())
+      getCapsuleMock.mockResolvedValue(capsule({
+        contributions: [anaText, { ...anaText, id: 'contribution-3', author: { name: user.name }, text: 'Oi, turma' }],
+      }))
+
+      typeMessage('  Oi, turma  ')
+      submit()
+
+      await waitFor(() => expect(contributeMock).toHaveBeenCalledWith('capsule-1', { text: 'Oi, turma', images: [] }))
+      expect(await screen.findByText('Contribuição enviada!')).toBeInTheDocument()
+      expect(await screen.findByText('Oi, turma')).toBeInTheDocument()
+      expect(getCapsuleMock).toHaveBeenCalledTimes(2)
+      expect(messageField()).toHaveValue('')
+      expect(uploadMock).not.toHaveBeenCalled()
+    })
+
+    it('sends text and images in a single request, without the capsule upload route', async () => {
+      contributeMock.mockResolvedValue(brunoPhotos)
+      await renderDetail(capsule())
+
+      typeMessage('Fotos')
+      pickImages('a.png', 'b.png')
+      submit()
+
+      await waitFor(() => expect(contributeMock).toHaveBeenCalledTimes(1))
+      const [, input] = contributeMock.mock.calls[0]
+      expect(input.text).toBe('Fotos')
+      expect(input.images?.map((file) => file.name)).toEqual(['a.png', 'b.png'])
+      expect(uploadMock).not.toHaveBeenCalled()
+      expect(await screen.findByText('Contribuição enviada!')).toBeInTheDocument()
+    })
+
+    it('accepts images without text', async () => {
+      contributeMock.mockResolvedValue(brunoPhotos)
+      await renderDetail(capsule())
+
+      pickImages('a.png')
+      submit()
+
+      await waitFor(() => expect(contributeMock).toHaveBeenCalledWith('capsule-1', {
+        text: undefined,
+        images: [expect.objectContaining({ name: 'a.png' })],
+      }))
+    })
+
+    it.each(['', '   '])('requires a text or an image, without calling the API (%j)', async (value) => {
       await renderDetail(capsule())
 
       typeMessage(value)
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
+      submit()
 
-      expect(await screen.findByText('Escreva sua mensagem.')).toBeInTheDocument()
+      expect(await screen.findByText('Escreva uma mensagem ou escolha ao menos uma imagem.')).toBeInTheDocument()
       expect(contributeMock).not.toHaveBeenCalled()
     })
 
-    it('sends only the text when there is no image, and refreshes the capsule', async () => {
-      await renderDetail(capsule())
-      contributeMock.mockResolvedValue({ id: 'c1', text: 'Meu texto', file: null })
-      getCapsuleMock.mockResolvedValue(capsule({ myContribution: { id: 'c1', text: 'Meu texto', file: null } }))
-
-      typeMessage('  Meu texto ')
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
-
-      expect(await screen.findByText('Contribuição enviada!')).toBeInTheDocument()
-      expect(contributeMock).toHaveBeenCalledWith('capsule-1', 'Meu texto')
-      expect(uploadMock).not.toHaveBeenCalled()
-      expect(await screen.findByText('Meu texto')).toBeInTheDocument()
-      expect(screen.queryByLabelText('Sua mensagem')).not.toBeInTheDocument()
-    })
-
-    it('sends the text and then the image', async () => {
-      await renderDetail(capsule())
-      contributeMock.mockResolvedValue({ id: 'c1', text: 'Meu texto', file: null })
-      uploadMock.mockResolvedValue(file)
-      getCapsuleMock.mockResolvedValue(capsule({ myContribution: { id: 'c1', text: 'Meu texto', file } }))
-
-      typeMessage('Meu texto')
-      pickImages('foto.png')
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
-
-      expect(await screen.findByRole('img', { name: 'foto.png' })).toBeInTheDocument()
-      expect(uploadMock).toHaveBeenCalledTimes(1)
-      expect(uploadMock.mock.calls[0][0]).toBe('capsule-1')
-      expect(contributeMock.mock.invocationCallOrder[0]).toBeLessThan(uploadMock.mock.invocationCallOrder[0])
-    })
-
-    it('allows only 1 image', async () => {
+    it('allows up to 3 images per contribution', async () => {
       await renderDetail(capsule())
 
-      pickImages('um.png', 'dois.png')
+      pickImages('1.png', '2.png', '3.png', '4.png')
 
-      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(1)
-      expect(screen.getByText(/“dois.png” não foi adicionada/)).toBeInTheDocument()
+      expect(screen.getByText('“4.png” não foi adicionada: o limite é de 3 imagens.')).toBeInTheDocument()
     })
 
-    it('keeps the saved text and lets the user retry only the failed image', async () => {
+    it('closes the form when the API says the deadline passed', async () => {
+      contributeMock.mockRejectedValue(apiError(409, 'CONTRIBUTION_DEADLINE_PASSED', 'O prazo de contribuição desta cápsula já passou.'))
       await renderDetail(capsule())
-      contributeMock.mockResolvedValue({ id: 'c1', text: 'Meu texto', file: null })
-      uploadMock.mockRejectedValueOnce(apiError(413, 'FILE_TOO_LARGE', 'Arquivo muito grande'))
-      getCapsuleMock.mockResolvedValue(capsule({ myContribution: { id: 'c1', text: 'Meu texto', file: null } }))
 
-      typeMessage('Meu texto')
-      pickImages('foto.png')
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
+      typeMessage('Atrasado')
+      submit()
 
-      expect(await screen.findByText('A imagem não foi enviada')).toBeInTheDocument()
-      const retry = await screen.findByRole('button', { name: 'Enviar imagem' })
-      expect(screen.getByText('Arquivo muito grande')).toBeInTheDocument()
-
-      uploadMock.mockResolvedValueOnce(file)
-      fireEvent.click(retry)
-
-      await waitFor(() => expect(uploadMock).toHaveBeenCalledTimes(2))
-      expect(contributeMock).toHaveBeenCalledTimes(1)
+      expect(await screen.findByText('O prazo de contribuição desta cápsula já passou.')).toBeInTheDocument()
+      expect(screen.getByText('O prazo para contribuições desta cápsula terminou.')).toBeInTheDocument()
+      expect(screen.queryByLabelText('Sua mensagem (opcional com imagens)')).not.toBeInTheDocument()
     })
 
-    it('shows the API message and keeps the text when sending fails', async () => {
+    it('marks the field and keeps the text on a validation error', async () => {
+      contributeMock.mockRejectedValue(apiError(422, 'VALIDATION_ERROR', 'Dados invalidos', [
+        { field: 'text', message: 'Deve ter no maximo 2.000 caracteres' },
+      ]))
       await renderDetail(capsule())
-      contributeMock.mockRejectedValue(
-        apiError(409, 'CONTRIBUTION_DEADLINE_PASSED', 'O prazo para contribuições foi encerrado.'),
-      )
 
-      typeMessage('Meu texto')
-      pickImages('foto.png')
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
+      typeMessage('Texto')
+      submit()
 
-      expect(await screen.findByRole('alert')).toHaveTextContent('O prazo para contribuições foi encerrado.')
-      expect(screen.getByLabelText('Sua mensagem')).toHaveValue('Meu texto')
-      expect(uploadMock).not.toHaveBeenCalled()
-      expect(screen.getByRole('button', { name: 'Enviar contribuição' })).toBeEnabled()
-    })
-
-    it('marks the field on a validation error from the API', async () => {
-      await renderDetail(capsule())
-      contributeMock.mockRejectedValue(
-        apiError(422, 'VALIDATION_ERROR', 'Dados invalidos', [{ field: 'text', message: 'Texto recusado' }]),
-      )
-
-      typeMessage('Meu texto')
-      fireEvent.click(screen.getByRole('button', { name: 'Enviar contribuição' }))
-
-      expect(await screen.findByText('Texto recusado')).toBeInTheDocument()
-      expect(screen.getByLabelText('Sua mensagem')).toHaveAttribute('aria-invalid', 'true')
-    })
-  })
-
-  describe('individual capsule', () => {
-    it('keeps the message and attachments, with no contribution section', async () => {
-      getCapsuleMock.mockResolvedValue(capsule({
-        type: undefined,
-        recipientEmail: 'ana@example.com',
-        participants: undefined,
-        myContribution: undefined,
-      }))
-      render(
-        <ToastProvider>
-          <AuthProvider>
-            <MemoryRouter initialEntries={['/capsulas/capsule-1']}>
-              <AppRoutes />
-            </MemoryRouter>
-          </AuthProvider>
-        </ToastProvider>,
-      )
-
-      expect(await screen.findByRole('heading', { name: 'Mensagem' })).toBeInTheDocument()
-      expect(screen.getByText('ana@example.com')).toBeInTheDocument()
-      expect(screen.getByRole('heading', { name: 'Anexos' })).toBeInTheDocument()
-      expect(screen.queryByRole('heading', { name: 'Sua contribuição' })).not.toBeInTheDocument()
+      expect(await screen.findByText('Deve ter no maximo 2.000 caracteres')).toBeInTheDocument()
+      expect(messageField()).toHaveAttribute('aria-invalid', 'true')
+      expect(messageField()).toHaveValue('Texto')
     })
   })
 })

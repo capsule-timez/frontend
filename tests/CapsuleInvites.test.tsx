@@ -6,7 +6,7 @@ import { AuthProvider } from '../src/contexts/AuthContext'
 import { ToastProvider } from '../src/contexts/ToastContext'
 import { AppRoutes } from '../src/routes/AppRoutes'
 import { getCapsule } from '../src/services/capsuleService'
-import { listInvites, sendInvites, type CapsuleInvite } from '../src/services/inviteService'
+import { listInvites, sendInvites, type CapsuleInvite, type InviteResult } from '../src/services/inviteService'
 import type { Capsule } from '../src/types/capsule'
 
 vi.mock('../src/services/capsuleService', async (importOriginal) => ({
@@ -27,37 +27,51 @@ const sendInvitesMock = vi.mocked(sendInvites)
 const creator = { id: 'user-1', name: 'Ana Lima', email: 'ana@example.com' }
 const participant = { id: 'user-2', name: 'Bruno Reis', email: 'bruno@example.com' }
 
+// Detalhe visto por quem criou: só ele recebe o inviteCode.
 const group: Capsule = {
   id: 'capsule-group',
   title: 'Turma 2026',
   text: 'Mensagem',
-  recipientEmail: null,
+  recipientEmail: 'turma@example.com',
   scheduleDate: '2030-01-01T12:00:00.000Z',
   status: 'SCHEDULED',
   sentAt: null,
   createdAt: '2026-01-01T12:00:00.000Z',
   files: [],
-  type: 'GROUP',
-  contributionDeadline: '2029-12-01T12:00:00.000Z',
-  inviteCode: 'ABC123',
+  inviteCode: 'a1b2c3d4',
   participants: [
-    { id: creator.id, name: creator.name, isCreator: true },
-    { id: participant.id, name: participant.name, isCreator: false },
+    { name: creator.name, role: 'OWNER' },
+    { name: participant.name, role: 'MEMBER' },
   ],
+  contributions: [],
 }
 
-const pending: CapsuleInvite = { id: 'invite-1', email: 'carla@example.com', status: 'PENDING' }
-const accepted: CapsuleInvite = { id: 'invite-2', email: 'bruno@example.com', status: 'ACCEPTED' }
-const expired: CapsuleInvite = { id: 'invite-3', email: 'davi@example.com', status: 'EXPIRED' }
+function invite(email: string, status: CapsuleInvite['status']): CapsuleInvite {
+  return {
+    email,
+    status,
+    sentAt: '2026-11-13T12:00:00.000Z',
+    expiresAt: '2029-12-01T12:00:00.000Z',
+    acceptedAt: status === 'ACCEPTED' ? '2026-11-14T12:00:00.000Z' : null,
+  }
+}
 
-function apiError(status: number, message: string, details?: unknown) {
+const pending = invite('carla@example.com', 'PENDING')
+const accepted = invite('bruno@example.com', 'ACCEPTED')
+const expired = invite('davi@example.com', 'EXPIRED')
+
+function sent(...emails: string[]): InviteResult[] {
+  return emails.map((email) => ({ email, result: 'SENT' }))
+}
+
+function apiError(status: number, message: string, details?: unknown, code = 'VALIDATION_ERROR') {
   const config = { headers: new AxiosHeaders() }
   return new AxiosError('Request failed', 'ERR', config, undefined, {
     status,
     statusText: '',
     headers: {},
     config,
-    data: { status: 'error', code: 'VALIDATION_ERROR', message, details },
+    data: { status: 'error', code, message, details },
   })
 }
 
@@ -92,7 +106,7 @@ describe('email invites on the group capsule detail', () => {
     listInvitesMock.mockReset()
     sendInvitesMock.mockReset()
     listInvitesMock.mockResolvedValue([])
-    sendInvitesMock.mockResolvedValue()
+    sendInvitesMock.mockImplementation(async (_id, emails) => sent(...emails))
   })
 
   afterEach(cleanup)
@@ -106,8 +120,8 @@ describe('email invites on the group capsule detail', () => {
       expect(listInvitesMock).toHaveBeenCalledWith(group.id, expect.any(AbortSignal))
     })
 
-    it('is hidden from participants who did not create the capsule', async () => {
-      await renderDetail(group, participant)
+    it('is hidden from members, who do not receive the invite code', async () => {
+      await renderDetail({ ...group, inviteCode: undefined }, participant)
 
       expect(screen.queryByRole('heading', { name: 'Convidar por e-mail' })).not.toBeInTheDocument()
       expect(listInvitesMock).not.toHaveBeenCalled()
@@ -118,11 +132,10 @@ describe('email invites on the group capsule detail', () => {
         ...group,
         id: 'capsule-individual',
         title: 'Carta para mim',
-        type: 'INDIVIDUAL',
         recipientEmail: creator.email,
-        contributionDeadline: null,
-        inviteCode: null,
-        participants: [],
+        inviteCode: undefined,
+        participants: undefined,
+        contributions: undefined,
       })
 
       expect(screen.queryByRole('heading', { name: 'Convidar por e-mail' })).not.toBeInTheDocument()
@@ -130,8 +143,8 @@ describe('email invites on the group capsule detail', () => {
     })
 
     it.each([
-      ['the contribution deadline passed', { contributionDeadline: '2020-01-01T12:00:00.000Z' }],
       ['the capsule was already sent', { status: 'SENT' as const }],
+      ['the deadline returned on creation passed', { contributionDeadline: '2020-01-01T12:00:00.000Z' }],
     ])('keeps only the list when %s', async (_label, changes) => {
       listInvitesMock.mockResolvedValue([pending])
 
@@ -145,7 +158,7 @@ describe('email invites on the group capsule detail', () => {
 
   describe('list', () => {
     it('shows each email with its status', async () => {
-      listInvitesMock.mockResolvedValue([pending, accepted, expired, { id: 'invite-4', email: 'eva@example.com', status: 'REVOKED' }])
+      listInvitesMock.mockResolvedValue([pending, accepted, expired, invite('eva@example.com', 'REVOKED')])
 
       await renderDetail()
 
@@ -183,7 +196,7 @@ describe('email invites on the group capsule detail', () => {
     it('sends several emails, shows a toast and refreshes the list', async () => {
       await renderDetail()
       await screen.findByText('Nenhum convite enviado.')
-      listInvitesMock.mockResolvedValue([pending, { ...pending, id: 'invite-5', email: 'davi@example.com' }])
+      listInvitesMock.mockResolvedValue([pending, invite('davi@example.com', 'PENDING')])
 
       submitEmails('Carla@Example.com, davi@example.com\ncarla@example.com')
 
@@ -229,23 +242,68 @@ describe('email invites on the group capsule detail', () => {
     })
 
     it('keeps the emails and shows the API error when sending fails', async () => {
-      sendInvitesMock.mockRejectedValue(apiError(400, 'Dados inválidos.', [
-        { field: 'emails.0', message: 'Este e-mail já participa da cápsula.' },
+      sendInvitesMock.mockRejectedValue(apiError(422, 'Dados invalidos', [
+        { field: 'emails.0', message: 'Deve ser um e-mail valido' },
       ]))
       await renderDetail()
 
       submitEmails('bruno@example.com')
 
       expect(await screen.findByText('Não foi possível enviar os convites')).toBeInTheDocument()
-      expect(screen.getAllByText('Este e-mail já participa da cápsula.').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('Deve ser um e-mail valido').length).toBeGreaterThan(0)
       expect(emailsField()).toHaveValue('bruno@example.com')
       expect(emailsField()).toHaveAttribute('aria-invalid', 'true')
       expect(listInvitesMock).toHaveBeenCalledTimes(1)
     })
 
+    it('reports people who already participate and e-mails that failed', async () => {
+      sendInvitesMock.mockResolvedValue([
+        { email: 'carla@example.com', result: 'SENT' },
+        { email: 'bruno@example.com', result: 'ALREADY_MEMBER' },
+        { email: 'davi@example.com', result: 'EMAIL_FAILED' },
+      ])
+      await renderDetail()
+
+      submitEmails('carla@example.com, bruno@example.com, davi@example.com')
+
+      expect(await screen.findByText('Convite enviado!')).toBeInTheDocument()
+      expect(screen.getByText('bruno@example.com já participa da cápsula.')).toBeInTheDocument()
+      expect(screen.getByText('Não foi possível enviar 1 e-mail de convite')).toBeInTheDocument()
+      expect(screen.getByText(/O convite para davi@example.com ficou registrado/)).toBeInTheDocument()
+    })
+
+    it('says when nobody new was invited', async () => {
+      sendInvitesMock.mockResolvedValue([{ email: 'bruno@example.com', result: 'ALREADY_MEMBER' }])
+      await renderDetail()
+
+      submitEmails('bruno@example.com')
+
+      expect(await screen.findByText('Nenhum convite novo')).toBeInTheDocument()
+    })
+
+    it('limits each request to 20 e-mails', async () => {
+      await renderDetail()
+
+      submitEmails(Array.from({ length: 21 }, (_, index) => `pessoa${index}@example.com`).join(' '))
+
+      expect(await screen.findByText('Envie no máximo 20 e-mails por vez.')).toBeInTheDocument()
+      expect(sendInvitesMock).not.toHaveBeenCalled()
+    })
+
+    it('closes the form when the API says the deadline passed', async () => {
+      sendInvitesMock.mockRejectedValue(apiError(409, 'O prazo de contribuição desta cápsula já passou.', undefined, 'CONTRIBUTION_DEADLINE_PASSED'))
+      await renderDetail()
+
+      submitEmails('carla@example.com')
+
+      expect(await screen.findByText('O prazo de contribuição desta cápsula já passou.')).toBeInTheDocument()
+      expect(screen.queryByLabelText('E-mails')).not.toBeInTheDocument()
+      expect(screen.getByText(/não é possível enviar novos convites/)).toBeInTheDocument()
+    })
+
     it('does not send twice while a request is in progress', async () => {
       let finish = () => {}
-      sendInvitesMock.mockImplementation(() => new Promise<void>((resolve) => { finish = resolve }))
+      sendInvitesMock.mockImplementation(() => new Promise((resolve) => { finish = () => resolve(sent('carla@example.com')) }))
       await renderDetail()
 
       fireEvent.change(emailsField(), { target: { value: 'carla@example.com' } })

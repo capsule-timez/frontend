@@ -89,25 +89,33 @@ describe('CapsulaPublicaPage (/c/:token)', () => {
     expect(screen.queryByRole('heading', { name: /entrar/i })).not.toBeInTheDocument()
   })
 
-  it('shows the text and image of each participant of a group capsule', async () => {
+  it('shows the creator message and every contribution of a group capsule', async () => {
     getPublicCapsuleMock.mockResolvedValue({
       ...capsule,
       files: [],
+      // Formato de GET /api/public/capsules/:token para cápsula em grupo.
       contributions: [
-        { id: 'c1', authorName: 'Ana Lima', text: 'Texto da Ana', file: capsule.files[0] },
-        { id: 'c2', authorName: 'Bruno Reis', text: 'Texto do Bruno', file: null },
+        { id: 'c1', author: { name: 'Ana Lima' }, text: 'Texto da Ana', createdAt: '2026-02-01T12:00:00.000Z', files: [capsule.files[0], capsule.files[1]] },
+        { id: 'c2', author: { name: 'Bruno Reis' }, text: null, createdAt: '2026-02-02T12:00:00.000Z', files: [capsule.files[1]] },
+        { id: 'c3', author: { name: 'Carla Dias' }, text: 'Só texto', createdAt: '2026-02-03T12:00:00.000Z', files: [] },
       ],
     })
 
     renderAt('/c/tk_abc123')
 
-    expect(await screen.findByRole('heading', { level: 2, name: 'Ana Lima' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { level: 2, name: 'Bruno Reis' })).toBeInTheDocument()
-    expect(screen.getByText('Texto da Ana')).toBeInTheDocument()
-    expect(screen.getByText('Texto do Bruno')).toBeInTheDocument()
-    expect(screen.getAllByRole('img')).toHaveLength(1)
-    expect(screen.getByRole('img', { name: 'foto-turma.jpg' })).toHaveAttribute('src', capsule.files[0].downloadUrl)
-    expect(screen.queryByRole('heading', { name: 'Mensagem' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 2, name: 'Mensagem' })).toBeInTheDocument()
+    expect(screen.getByText(/Parabéns pela conquista!/)).toBeInTheDocument()
+    const list = screen.getByRole('list', { name: 'Contribuições' })
+    const [ana, bruno, carla] = Array.from(list.children) as HTMLElement[]
+    expect(list.children).toHaveLength(3)
+    expect(ana).toHaveTextContent('Ana Lima')
+    expect(ana).toHaveTextContent('Texto da Ana')
+    expect(within(ana).getAllByRole('img')).toHaveLength(2)
+    expect(bruno).toHaveTextContent('Bruno Reis')
+    expect(within(bruno).getByRole('img', { name: 'bolo.png' })).toHaveAttribute('src', capsule.files[1].downloadUrl)
+    expect(carla).toHaveTextContent('Só texto')
+    expect(within(carla).queryByRole('img')).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Imagens' })).not.toBeInTheDocument()
   })
 
   it('renders the attached images from downloadUrl', async () => {

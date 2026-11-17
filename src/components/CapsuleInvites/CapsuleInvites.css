@@ -37,7 +37,16 @@
 }
 
 .capsule-invites__email {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
   min-width: 0;
   overflow-wrap: anywhere;
   font-weight: 500;
+}
+
+.capsule-invites__email small {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+  font-weight: 400;
 }

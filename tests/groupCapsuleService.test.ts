@@ -1,6 +1,6 @@
 import { AxiosError, AxiosHeaders, type InternalAxiosRequestConfig } from 'axios'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { contributeToCapsule, createCapsule, getApiErrorDetails, joinCapsule } from '../src/services/capsuleService'
+import { contributeToCapsule, createCapsule, getApiErrorDetails, joinCapsule, updateCapsule } from '../src/services/capsuleService'
 import { httpClient, setAuthTokenGetter } from '../src/services/httpClient'
 
 const capsule = { id: 'capsule-1', title: 'Turma', type: 'GROUP', inviteCode: 'ABC123' }
@@ -44,10 +44,11 @@ describe('group capsule requests', () => {
     expect(requests[0].headers.get('Authorization')).toBe('Bearer session-token')
   })
 
-  it('sends type and contributionDeadline on POST /api/capsules', async () => {
+  it('sends type, contributionDeadline and the recipient on POST /api/capsules', async () => {
     const input = {
       title: 'Turma',
       text: 'Mensagem',
+      recipientEmail: 'ana@example.com',
       scheduleDate: '2026-12-31T12:00:00.000Z',
       type: 'GROUP' as const,
       contributionDeadline: '2026-12-01T12:00:00.000Z',
@@ -60,12 +61,46 @@ describe('group capsule requests', () => {
     expect(JSON.parse(requests[0].data as string)).toEqual(input)
   })
 
-  it('sends a contribution through POST /api/capsules/:id/contributions', async () => {
-    await contributeToCapsule('capsule/1', 'Minha mensagem')
+  it('sends a text-only contribution as JSON to POST /api/capsules/:id/contributions', async () => {
+    await contributeToCapsule('capsule/1', { text: 'Minha mensagem' })
 
     expect(requests[0].method).toBe('post')
     expect(requests[0].url).toBe('/api/capsules/capsule%2F1/contributions')
     expect(JSON.parse(requests[0].data as string)).toEqual({ text: 'Minha mensagem' })
+    expect(requests[0].headers.get('Authorization')).toBe('Bearer session-token')
+  })
+
+  it('sends text and images together as multipart in the files field', async () => {
+    const images = [
+      new File(['a'], 'a.png', { type: 'image/png' }),
+      new File(['b'], 'b.jpg', { type: 'image/jpeg' }),
+    ]
+
+    await contributeToCapsule('capsule-1', { text: 'Fotos da turma', images })
+
+    expect(requests).toHaveLength(1)
+    const form = requests[0].data as FormData
+    expect(form).toBeInstanceOf(FormData)
+    expect(form.get('text')).toBe('Fotos da turma')
+    expect(form.getAll('files')).toEqual(images)
+  })
+
+  it('sends only images without an empty text field', async () => {
+    const image = new File(['a'], 'a.png', { type: 'image/png' })
+
+    await contributeToCapsule('capsule-1', { images: [image] })
+
+    const form = requests[0].data as FormData
+    expect(form.has('text')).toBe(false)
+    expect(form.getAll('files')).toEqual([image])
+  })
+
+  it('updates a capsule through PATCH /api/capsules/:id with only the given fields', async () => {
+    await updateCapsule('capsule/1', { title: 'Novo', scheduleDate: '2027-01-01T12:00:00.000Z' })
+
+    expect(requests[0].method).toBe('patch')
+    expect(requests[0].url).toBe('/api/capsules/capsule%2F1')
+    expect(JSON.parse(requests[0].data as string)).toEqual({ title: 'Novo', scheduleDate: '2027-01-01T12:00:00.000Z' })
     expect(requests[0].headers.get('Authorization')).toBe('Bearer session-token')
   })
 

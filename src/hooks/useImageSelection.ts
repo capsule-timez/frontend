@@ -76,6 +76,12 @@ export function useImageSelection(maxFiles: number) {
     [commit],
   )
 
+  const clear = useCallback(() => {
+    for (const item of itemsRef.current) URL.revokeObjectURL(item.previewUrl)
+    commit([])
+    setRejections([])
+  }, [commit])
+
   const patch = useCallback(
     (key: string, changes: Partial<SelectedImage>) => {
       commit(itemsRef.current.map((item) => (item.key === key ? { ...item, ...changes } : item)))
@@ -109,5 +115,5 @@ export function useImageSelection(maxFiles: number) {
     [commit, patch],
   )
 
-  return { items, rejections, isUploading, add, remove, upload }
+  return { items, rejections, isUploading, add, remove, clear, upload }
 }

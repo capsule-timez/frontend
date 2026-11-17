@@ -5,9 +5,11 @@ import type {
   CapsuleContribution,
   CapsuleFile,
   CapsuleSummary,
+  ContributionInput,
   CreateCapsuleInput,
   PaginatedResponse,
   PublicCapsule,
+  UpdateCapsuleInput,
 } from '../types/capsule'
 import { httpClient } from './httpClient'
 
@@ -29,15 +31,31 @@ export async function createCapsule(input: CreateCapsuleInput): Promise<Capsule>
   return data
 }
 
+/** A resposta traz só os campos de conteúdo; recarregue o detalhe para ver participantes e contribuições. */
+export async function updateCapsule(id: string, input: UpdateCapsuleInput): Promise<Capsule> {
+  const { data } = await httpClient.patch<Capsule>(`/api/capsules/${encodeURIComponent(id)}`, input)
+  return data
+}
+
 export async function joinCapsule(inviteCode: string): Promise<Capsule> {
   const { data } = await httpClient.post<Capsule>('/api/capsules/join', { inviteCode })
   return data
 }
 
-export async function contributeToCapsule(id: string, text: string): Promise<CapsuleContribution> {
+/** Só texto vai em JSON; com imagens, texto e arquivos vão juntos em multipart no campo `files`. */
+export async function contributeToCapsule(
+  id: string,
+  { text, images = [] }: ContributionInput,
+): Promise<CapsuleContribution> {
+  let body: FormData | { text?: string } = { text }
+  if (images.length > 0) {
+    body = new FormData()
+    if (text) body.append('text', text)
+    for (const image of images) body.append('files', image)
+  }
   const { data } = await httpClient.post<CapsuleContribution>(
     `/api/capsules/${encodeURIComponent(id)}/contributions`,
-    { text },
+    body,
   )
   return data
 }

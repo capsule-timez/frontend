@@ -2,15 +2,17 @@ import type { Capsule, CapsuleParticipant } from '../types/capsule'
 
 const MAX_LISTED_PARTICIPANTS = 3
 
-export function isGroupCapsule(capsule: Pick<Capsule, 'type'>): boolean {
-  return capsule.type === 'GROUP'
+/**
+ * A API só manda `type` na criação. No detalhe e na listagem, a cápsula em
+ * grupo é a única que traz `participants`.
+ */
+export function isGroupCapsule(capsule: Pick<Capsule, 'type' | 'participants'>): boolean {
+  return capsule.type === 'GROUP' || Array.isArray(capsule.participants)
 }
 
-export function isCapsuleCreator(
-  capsule: Pick<Capsule, 'participants'>,
-  userId: string | undefined,
-): boolean {
-  return Boolean(capsule.participants?.some((person) => person.id === userId && person.isCreator))
+/** A API só envia o código de convite para quem criou a cápsula em grupo. */
+export function isGroupOwner(capsule: Pick<Capsule, 'type' | 'participants' | 'inviteCode'>): boolean {
+  return isGroupCapsule(capsule) && Boolean(capsule.inviteCode)
 }
 
 export function formatParticipantNames(participants: CapsuleParticipant[]): string {

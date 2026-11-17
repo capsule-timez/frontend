@@ -2,7 +2,14 @@ import axios from 'axios'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useToast } from '../../contexts/ToastContext'
 import { getApiError } from '../../services/apiError'
-import { listInvites, sendInvites, type CapsuleInvite } from '../../services/inviteService'
+import { getApiErrorDetails } from '../../services/capsuleService'
+import {
+  listInvites,
+  MAX_INVITES_PER_REQUEST,
+  sendInvites,
+  type CapsuleInvite,
+  type InviteResult,
+} from '../../services/inviteService'
 import type { Capsule } from '../../types/capsule'
 import { formatDateTime, isInFuture } from '../../utils/formatDate'
 import { Alert } from '../Alert/Alert'
@@ -33,6 +40,14 @@ function errorMessage(error: unknown): string {
   return error instanceof Error && !axios.isAxiosError(error) ? error.message : getApiError(error).message
 }
 
+function plural(count: number, one: string, many: string) {
+  return `${count} ${count === 1 ? one : many}`
+}
+
+function emailsOf(results: InviteResult[], result: InviteResult['result']) {
+  return results.filter((item) => item.result === result).map((item) => item.email)
+}
+
 interface CapsuleInvitesProps {
   capsule: Pick<Capsule, 'id' | 'status' | 'contributionDeadline'>
 }
@@ -45,10 +60,12 @@ export function CapsuleInvites({ capsule }: CapsuleInvitesProps) {
   const [listError, setListError] = useState<string>()
   const [revision, setRevision] = useState(0)
   const [sending, setSending] = useState(false)
+  const [deadlinePassed, setDeadlinePassed] = useState(false)
   const submitting = useRef(false)
 
+  // O detalhe não traz o prazo; se ele já passou, a API responde 409 e o formulário fecha.
   const deadline = capsule.contributionDeadline
-  const isOpen = capsule.status === 'SCHEDULED' && Boolean(deadline && isInFuture(deadline))
+  const isOpen = capsule.status === 'SCHEDULED' && !deadlinePassed && (!deadline || isInFuture(deadline))
 
   useEffect(() => {
     const controller = new AbortController()
@@ -67,6 +84,28 @@ export function CapsuleInvites({ capsule }: CapsuleInvitesProps) {
     setRevision((value) => value + 1)
   }
 
+  function reportResults(results: InviteResult[]) {
+    const sent = emailsOf(results, 'SENT')
+    const failed = emailsOf(results, 'EMAIL_FAILED')
+    const members = emailsOf(results, 'ALREADY_MEMBER')
+    const membersNote = members.length
+      ? `${members.join(', ')} já ${members.length === 1 ? 'participa' : 'participam'} da cápsula.`
+      : undefined
+
+    if (sent.length) {
+      toast.success(sent.length === 1 ? 'Convite enviado!' : `${sent.length} convites enviados!`, {
+        description: membersNote,
+      })
+    } else if (!failed.length && membersNote) {
+      toast.info('Nenhum convite novo', { description: membersNote })
+    }
+    if (failed.length) {
+      toast.error(`Não foi possível enviar ${plural(failed.length, 'e-mail', 'e-mails')} de convite`, {
+        description: `O convite para ${failed.join(', ')} ficou registrado. Tente enviar de novo mais tarde.`,
+      })
+    }
+  }
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (submitting.current) return
@@ -81,20 +120,26 @@ export function CapsuleInvites({ capsule }: CapsuleInvitesProps) {
       setFieldError(`E-mail inválido: ${invalid.join(', ')}`)
       return
     }
+    if (emails.length > MAX_INVITES_PER_REQUEST) {
+      setFieldError(`Envie no máximo ${MAX_INVITES_PER_REQUEST} e-mails por vez.`)
+      return
+    }
 
     submitting.current = true
     setSending(true)
     setFieldError(undefined)
     try {
-      await sendInvites(capsule.id, emails)
+      reportResults(await sendInvites(capsule.id, emails))
       setInput('')
-      toast.success(emails.length === 1 ? 'Convite enviado!' : `${emails.length} convites enviados!`)
       refresh()
     } catch (error) {
-      const { message, fieldErrors } = getApiError(error)
+      const { code, message, fieldErrors } = getApiErrorDetails(error)
+      if (code === 'CONTRIBUTION_DEADLINE_PASSED') setDeadlinePassed(true)
       const emailsError = Object.entries(fieldErrors).find(([field]) => field.startsWith('emails'))?.[1]
       setFieldError(emailsError)
-      toast.error('Não foi possível enviar os convites', { description: emailsError ?? message })
+      toast.error('Não foi possível enviar os convites', {
+        description: emailsError ?? (code === 'UNKNOWN' ? errorMessage(error) : message),
+      })
     } finally {
       submitting.current = false
       setSending(false)
@@ -105,12 +150,12 @@ export function CapsuleInvites({ capsule }: CapsuleInvitesProps) {
     <Card className="capsula-detalhe__content capsule-invites">
       <h2>Convidar por e-mail</h2>
 
-      {isOpen && deadline ? (
+      {isOpen ? (
         <form className="capsule-invites__form" onSubmit={submit} noValidate>
           <TextAreaField
             label="E-mails"
             name="emails"
-            hint={`Separe os endereços por vírgula, espaço ou quebra de linha. Os convidados podem entrar até ${formatDateTime(deadline)}.`}
+            hint={`Separe os endereços por vírgula, espaço ou quebra de linha (até ${MAX_INVITES_PER_REQUEST} por vez). O convite vale até o prazo para contribuições.`}
             value={input}
             onChange={(event) => {
               setInput(event.target.value)
@@ -144,8 +189,15 @@ export function CapsuleInvites({ capsule }: CapsuleInvitesProps) {
           {invites.map((invite) => {
             const badge = STATUS_BADGES[invite.status] ?? { label: invite.status, tone: 'neutral' }
             return (
-              <li key={invite.id}>
-                <span className="capsule-invites__email">{invite.email}</span>
+              <li key={invite.email}>
+                <span className="capsule-invites__email">
+                  {invite.email}
+                  {invite.sentAt && (
+                    <small>
+                      Enviado em <time dateTime={invite.sentAt}>{formatDateTime(invite.sentAt)}</time>
+                    </small>
+                  )}
+                </span>
                 <Badge tone={badge.tone}>{badge.label}</Badge>
               </li>
             )

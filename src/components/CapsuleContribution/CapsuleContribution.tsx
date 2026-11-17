@@ -3,54 +3,55 @@ import { useToast } from '../../contexts/ToastContext'
 import { useImageSelection } from '../../hooks/useImageSelection'
 import { contributeToCapsule, getApiErrorDetails } from '../../services/capsuleService'
 import type { Capsule } from '../../types/capsule'
-import { TEXT_MAX_LENGTH, validateContributionText } from '../../utils/capsuleValidation'
-import { formatDateTime, isInFuture } from '../../utils/formatDate'
-import { MAX_IMAGES_PER_PARTICIPANT } from '../../utils/imageValidation'
+import { CONTRIBUTION_TEXT_MAX_LENGTH, validateContributionText } from '../../utils/capsuleValidation'
+import { isInFuture } from '../../utils/formatDate'
+import { MAX_IMAGES_PER_CONTRIBUTION } from '../../utils/imageValidation'
 import { Button } from '../Button/Button'
 import { Card } from '../Card/Card'
-import { CapsuleImage } from '../CapsuleImage/CapsuleImage'
+import { ContributionList } from '../ContributionList/ContributionList'
 import { TextAreaField } from '../FormField/TextAreaField'
 import { ImagePicker } from '../ImagePicker/ImagePicker'
 import './CapsuleContribution.css'
 
 interface CapsuleContributionProps {
-  capsule: Capsule
+  capsule: Pick<Capsule, 'id' | 'status' | 'contributionDeadline' | 'contributions'>
   onContributed: () => Promise<void>
 }
 
 export function CapsuleContribution({ capsule, onContributed }: CapsuleContributionProps) {
   const toast = useToast()
-  const images = useImageSelection(MAX_IMAGES_PER_PARTICIPANT)
+  const images = useImageSelection(MAX_IMAGES_PER_CONTRIBUTION)
   const [text, setText] = useState('')
   const [textError, setTextError] = useState<string | undefined>()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [deadlinePassed, setDeadlinePassed] = useState(false)
 
-  const contribution = capsule.myContribution ?? null
-  const deadline = capsule.contributionDeadline
-  const isOpen = capsule.status === 'SCHEDULED' && Boolean(deadline && isInFuture(deadline))
+  const contributions = capsule.contributions ?? []
+  // O detalhe não traz o prazo; se ele já passou, a API responde 409 e o formulário fecha.
+  const isOpen = capsule.status === 'SCHEDULED' && !deadlinePassed &&
+    (!capsule.contributionDeadline || isInFuture(capsule.contributionDeadline))
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    if (!contribution) {
-      const error = validateContributionText(text)
-      setTextError(error)
-      if (error) return
-    }
+    const error = validateContributionText(text, images.items.length)
+    setTextError(error)
+    if (error) return
 
     setIsSubmitting(true)
     try {
-      if (!contribution) await contributeToCapsule(capsule.id, text.trim())
-      const { failed } = images.items.length > 0 ? await images.upload(capsule.id) : { failed: 0 }
-      if (failed > 0) {
-        toast.error('A imagem não foi enviada', { description: 'Veja o erro na miniatura e tente novamente.' })
-      } else {
-        toast.success('Contribuição enviada!')
-      }
+      await contributeToCapsule(capsule.id, {
+        text: text.trim() || undefined,
+        images: images.items.map((item) => item.file),
+      })
+      setText('')
+      images.clear()
+      toast.success('Contribuição enviada!')
       await onContributed()
-    } catch (error) {
-      const details = getApiErrorDetails(error)
-      toast.error(details.message)
+    } catch (err) {
+      const details = getApiErrorDetails(err)
+      if (details.code === 'CONTRIBUTION_DEADLINE_PASSED') setDeadlinePassed(true)
+      toast.error('Não foi possível enviar a contribuição', { description: details.message })
       setTextError(details.fieldErrors.text)
     } finally {
       setIsSubmitting(false)
@@ -59,56 +60,54 @@ export function CapsuleContribution({ capsule, onContributed }: CapsuleContribut
 
   return (
     <Card className="capsula-detalhe__content capsule-contribution">
-      <h2>Sua contribuição</h2>
+      <h2>Contribuições</h2>
 
-      {contribution && (
-        <>
-          <p className="capsule-contribution__text">{contribution.text}</p>
-          {contribution.file && <CapsuleImage key={contribution.file.downloadUrl} file={contribution.file} />}
-        </>
-      )}
+      {contributions.length > 0
+        ? <ContributionList contributions={contributions} />
+        : <p>Ninguém contribuiu ainda.</p>}
 
-      {!contribution && !isOpen && <p>Você não enviou uma contribuição para esta cápsula.</p>}
-
-      {isOpen && deadline && (!contribution || !contribution.file) && (
+      {isOpen ? (
         <form className="capsule-contribution__form" onSubmit={handleSubmit} noValidate>
+          <h3>Nova contribuição</h3>
           <p className="capsule-contribution__hint">
-            {contribution ? 'Você ainda pode anexar 1 imagem' : 'Deixe 1 texto e 1 imagem'} até{' '}
-            <time dateTime={deadline}>{formatDateTime(deadline)}</time>. As contribuições ficam
-            lacradas até a entrega e, depois de enviadas, não podem ser alteradas.
+            Envie um texto, até {MAX_IMAGES_PER_CONTRIBUTION} imagens ou os dois. Você pode contribuir
+            mais de uma vez até o prazo, e cada contribuição fica visível para os participantes e não
+            pode ser alterada depois de enviada.
           </p>
-          {!contribution && (
-            <TextAreaField
-              id="capsule-contribution-text"
-              name="text"
-              label="Sua mensagem"
-              counter={`${text.length.toLocaleString('pt-BR')}/${TEXT_MAX_LENGTH.toLocaleString('pt-BR')}`}
-              maxLength={TEXT_MAX_LENGTH}
-              rows={5}
-              value={text}
-              error={textError}
-              onChange={(event) => {
-                setText(event.target.value)
-                setTextError(undefined)
-              }}
-            />
-          )}
+          <TextAreaField
+            id="capsule-contribution-text"
+            name="text"
+            label="Sua mensagem (opcional com imagens)"
+            counter={`${text.length.toLocaleString('pt-BR')}/${CONTRIBUTION_TEXT_MAX_LENGTH.toLocaleString('pt-BR')}`}
+            maxLength={CONTRIBUTION_TEXT_MAX_LENGTH}
+            rows={5}
+            value={text}
+            error={textError}
+            disabled={isSubmitting}
+            onChange={(event) => {
+              setText(event.target.value)
+              setTextError(undefined)
+            }}
+          />
           <ImagePicker
             items={images.items}
             rejections={images.rejections}
-            maxFiles={MAX_IMAGES_PER_PARTICIPANT}
+            maxFiles={MAX_IMAGES_PER_CONTRIBUTION}
             disabled={isSubmitting}
-            onAdd={images.add}
+            onAdd={(files) => {
+              images.add(files)
+              setTextError(undefined)
+            }}
             onRemove={images.remove}
           />
-          {(!contribution || images.items.length > 0) && (
-            <div className="capsule-contribution__actions">
-              <Button type="submit" icon="send" loading={isSubmitting}>
-                {isSubmitting ? 'Enviando…' : contribution ? 'Enviar imagem' : 'Enviar contribuição'}
-              </Button>
-            </div>
-          )}
+          <div className="capsule-contribution__actions">
+            <Button type="submit" icon="send" loading={isSubmitting}>
+              {isSubmitting ? 'Enviando…' : 'Enviar contribuição'}
+            </Button>
+          </div>
         </form>
+      ) : (
+        <p className="capsule-contribution__hint">O prazo para contribuições desta cápsula terminou.</p>
       )}
     </Card>
   )

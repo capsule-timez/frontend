@@ -1,49 +1,46 @@
 import { describe, expect, it } from 'vitest'
 import type { CapsuleParticipant } from '../src/types/capsule'
-import {
-  formatParticipantNames,
-  isCapsuleCreator,
-  isGroupCapsule,
-} from '../src/utils/capsuleGroup'
+import { formatParticipantNames, isGroupCapsule, isGroupOwner } from '../src/utils/capsuleGroup'
 
-function person(id: string, name: string, isCreator = false): CapsuleParticipant {
-  return { id, name, isCreator }
+function person(name: string, role: CapsuleParticipant['role'] = 'MEMBER'): CapsuleParticipant {
+  return { name, role }
 }
 
 describe('isGroupCapsule', () => {
-  it('is true only for GROUP', () => {
+  it('uses the type sent on creation', () => {
     expect(isGroupCapsule({ type: 'GROUP' })).toBe(true)
     expect(isGroupCapsule({ type: 'INDIVIDUAL' })).toBe(false)
   })
 
-  it('treats a capsule without type, as the current API returns, as individual', () => {
+  it('recognizes the detail and list items by the participants the API sends only for groups', () => {
+    expect(isGroupCapsule({ participants: [person('Ana', 'OWNER')] })).toBe(true)
+    expect(isGroupCapsule({ participants: [] })).toBe(true)
+  })
+
+  it('treats a capsule without type and participants as individual', () => {
     expect(isGroupCapsule({})).toBe(false)
   })
 })
 
-describe('isCapsuleCreator', () => {
-  const participants = [person('u1', 'Ana', true), person('u2', 'Bruno')]
+describe('isGroupOwner', () => {
+  const participants = [person('Ana', 'OWNER'), person('Bruno')]
 
-  it('recognizes the creator', () => {
-    expect(isCapsuleCreator({ participants }, 'u1')).toBe(true)
+  it('recognizes the owner by the invite code the API sends only to them', () => {
+    expect(isGroupOwner({ participants, inviteCode: 'abc123' })).toBe(true)
   })
 
-  it('denies a participant who is not the creator', () => {
-    expect(isCapsuleCreator({ participants }, 'u2')).toBe(false)
+  it('denies a member, who never receives the code', () => {
+    expect(isGroupOwner({ participants })).toBe(false)
+    expect(isGroupOwner({ participants, inviteCode: '' })).toBe(false)
   })
 
-  it('denies someone outside the list', () => {
-    expect(isCapsuleCreator({ participants }, 'u3')).toBe(false)
-  })
-
-  it('denies when the user or the list is unknown', () => {
-    expect(isCapsuleCreator({ participants }, undefined)).toBe(false)
-    expect(isCapsuleCreator({}, 'u1')).toBe(false)
+  it('denies an individual capsule even with a code', () => {
+    expect(isGroupOwner({ inviteCode: 'abc123' })).toBe(false)
   })
 })
 
 describe('formatParticipantNames', () => {
-  const people = ['Ana', 'Bruno', 'Carla', 'Davi', 'Elis'].map((name) => person(name, name))
+  const people = ['Ana', 'Bruno', 'Carla', 'Davi', 'Elis'].map((name) => person(name))
 
   it('lists everyone when there are up to three', () => {
     expect(formatParticipantNames(people.slice(0, 1))).toBe('Ana')

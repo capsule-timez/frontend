@@ -6,17 +6,18 @@ Interface web do sistema Cápsula do Tempo, construída em React. Consome a API 
 
 ## Sobre o projeto
 
-Cápsula do Tempo é um sistema que permite escrever uma mensagem hoje e recebê-la em uma data futura. O usuário cria uma cápsula com texto, imagens e arquivos, escolhe quando ela deve ser entregue e para quem — para si mesmo ou para outra pessoa. Na data agendada, o sistema envia automaticamente um e-mail com um link que abre a cápsula.
+Cápsula do Tempo é um sistema que permite escrever uma mensagem hoje e recebê-la em uma data futura. O usuário cria uma cápsula com texto e imagens, escolhe quando ela deve ser entregue e para quem — para si mesmo ou para outra pessoa. Na data agendada, o sistema envia automaticamente um e-mail com um link que abre a cápsula.
 
 A ideia é a de uma carta para o futuro: algo guardado deliberadamente, que só se revela quando o momento chega.
 
 ### O que o sistema faz
 
 - Cadastro e autenticação de usuários com e-mail e senha
-- Criação de cápsulas com texto, imagens e arquivos anexos
+- Criação de cápsulas com texto e imagens anexas (JPEG, PNG ou WebP)
 - Agendamento de uma data futura para entrega
 - Escolha do destinatário: o próprio usuário ou um terceiro, identificado por e-mail
-- Edição e cancelamento de cápsulas ainda não entregues
+- Cápsulas em grupo: convidados entram por código ou por convite por e-mail e deixam textos e imagens até um prazo
+- Edição e exclusão de cápsulas ainda não entregues
 - Envio automático por e-mail na data agendada, sem intervenção manual
 - Visualização da cápsula por quem a recebeu, sem necessidade de ter conta no sistema
 - Listagem das cápsulas criadas, com acompanhamento do status de cada uma
@@ -43,7 +44,7 @@ A API concentra toda a regra de negócio, a persistência e a orquestração de 
 
 ### Como funciona a entrega agendada
 
-A API executa um job a cada hora que consulta as cápsulas cuja data de entrega já passou e que ainda não foram enviadas. Para cada uma, dispara o e-mail e atualiza o status.
+A API executa um job a cada minuto que consulta as cápsulas cuja data de entrega já passou e que ainda não foram enviadas. Para cada uma, dispara o e-mail e atualiza o status.
 
 O e-mail não carrega os arquivos como anexo — carrega um link para uma página desta aplicação, identificada por um token de acesso. Isso contorna os limites de tamanho de anexo dos provedores de e-mail e permite que o acesso ao conteúdo continue sob controle do sistema.
 
@@ -103,7 +104,9 @@ Para validar: crie mais de 20 cápsulas na mesma conta, confira os botões **Ant
 
 Veja os detalhes da implementação, os passos de validação e as [capturas de filtro e paginação](docs/listagem-filtros-paginacao.md).
 
-Os cards abrem a rota protegida `/capsulas/:id`, que consulta `GET /api/capsules/{id}` e exibe os dados e anexos da cápsula. Consulte a [documentação do detalhe, validação e capturas de tela](docs/capsula-detalhe.md).
+Os cards abrem a rota protegida `/capsulas/:id`, que consulta `GET /api/capsules/{id}` e exibe os dados e anexos da cápsula. Enquanto ela está agendada, quem a criou pode editá-la (`PATCH /api/capsules/{id}`, só com os campos alterados), anexar imagens e excluí-la. Consulte a [documentação do detalhe, validação e capturas de tela](docs/capsula-detalhe.md).
+
+A cápsula em grupo e os convites por e-mail seguem o contrato descrito em [docs/capsula-em-grupo.md](docs/capsula-em-grupo.md) e [docs/convite-por-email.md](docs/convite-por-email.md).
 
 ### Execução
 
@@ -140,7 +143,9 @@ src/
 | `/cadastro` | Público | Criação de conta |
 | `/capsulas` | Autenticado | Listagem das cápsulas do usuário |
 | `/capsulas/nova` | Autenticado | Criação de cápsula |
+| `/capsulas/entrar` | Autenticado | Entrada em cápsula em grupo pelo código de convite |
 | `/capsulas/:id` | Autenticado | Detalhe e edição |
+| `/convite/:token` | Autenticado | Aceite do convite por e-mail (sem sessão, pede login e volta ao convite) |
 | `/c/:token` | Público | Visualização da cápsula recebida por e-mail |
 
 A rota `/c/:token` é a única rota pública que exibe conteúdo. Ela existe porque o destinatário de uma cápsula pode não ter conta no sistema — o acesso é concedido pelo token contido no link, não por autenticação.
@@ -161,14 +166,14 @@ Rotas autenticadas redirecionam para o login quando não há sessão válida. A 
 - `services/httpClient` envia `Authorization: Bearer <token>` quando há sessão. Se a API responder `401` a uma requisição que levava token (expirado ou inválido), a sessão local é encerrada e o usuário volta ao login. Um `401` no próprio login (credenciais inválidas) não encerra nada.
 - O cadastro cria a conta e em seguida faz o login com as mesmas credenciais, já que a API não emite token no cadastro.
 
-### Contrato assumido com a API
+### Contrato com a API
 
 Todas as chamadas ficam em `services/authService.ts`; se o contrato mudar, é o único lugar a ajustar.
 
 | Endpoint | Envia | Sucesso | Erros tratados |
 |---|---|---|---|
-| `POST /api/auth/register` | `{ name, email, password }` | `2xx` (o corpo não é usado) | `400` com `details: [{ field, message }]`, `409` e-mail já cadastrado |
-| `POST /api/auth/login` | `{ email, password }` | `{ token, user: { id, name, email } }` | `401` credenciais inválidas |
+| `POST /api/auth/register` | `{ name, email, password }` | `201` (o corpo não é usado) | `400` com `details: [{ field, message }]`, `409` e-mail já cadastrado |
+| `POST /api/auth/login` | `{ email, password }` | `{ token, user: { id, name, email, createdAt } }` | `400` e-mail ou senha ausentes, `401` credenciais inválidas |
 
 Erros seguem o formato da API, `{ status: 'error', message, details? }`: a `message` aparece no topo do formulário e os itens de `details` aparecem junto do campo correspondente. Falhas de rede mostram uma mensagem própria.
 
@@ -209,10 +214,15 @@ A interface segue o Documento de Design de Interface do projeto. Os valores abai
 
 ## Limites do sistema
 
-| Limite | Valor padrão |
+| Limite | Valor |
 |---|---|
-| Tamanho por arquivo | 20 MB |
-| Tamanho total por cápsula | 50 MB |
+| Tamanho por imagem | 10 MB |
+| Tipos de imagem | JPEG, PNG e WebP |
+| Imagens anexadas pela pessoa que cria a cápsula | 5 |
+| Imagens por contribuição em grupo | 3 |
+| Texto da cápsula | 10.000 caracteres |
+| Texto de uma contribuição | 2.000 caracteres |
+| E-mails por envio de convites | 20 |
 | Validade da URL de download | 1 hora |
 
 Os limites são validados pela API, mas também devem ser verificados nesta aplicação antes do envio, para que o usuário receba retorno imediato.
@@ -234,7 +244,7 @@ O Linear atualiza o status da issue automaticamente conforme o Pull Request avan
 
 ## Escopo
 
-Esta entrega corresponde ao MVP do sistema. A funcionalidade de cápsulas coletivas, em que um grupo de usuários contribui para uma mesma cápsula entregue a todos os membros, foi deliberadamente adiada após a estimativa de capacidade da equipe, e está registrada como trabalho futuro na documentação do projeto.
+Esta entrega corresponde ao MVP do sistema, com cápsulas individuais e em grupo. Na cápsula em grupo, a entrega vai para o e-mail escolhido na criação, e a página pública reúne a mensagem de quem criou e todas as contribuições. A entrega para o e-mail de cada participante continua registrada como trabalho futuro.
 
 ---
 
