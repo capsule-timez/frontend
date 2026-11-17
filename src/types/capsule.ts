@@ -2,11 +2,11 @@ export type CapsuleStatus = 'SCHEDULED' | 'SENT' | 'FAILED'
 
 export type CapsuleType = 'INDIVIDUAL' | 'GROUP'
 
+export type CapsuleMemberRole = 'OWNER' | 'MEMBER'
+
 export interface CapsuleParticipant {
-  id: string
   name: string
-  isCreator: boolean
-  hasContributed?: boolean
+  role: CapsuleMemberRole
 }
 
 export interface CapsuleFile {
@@ -21,30 +21,34 @@ export interface CapsuleFile {
 
 export interface CapsuleContribution {
   id: string
-  text: string
-  file: CapsuleFile | null
-}
-
-export interface PublicContribution extends CapsuleContribution {
-  authorName: string
+  author: { name: string }
+  /** Nulo quando a contribuição tem só imagens. */
+  text: string | null
+  createdAt: string
+  files: CapsuleFile[]
 }
 
 export interface Capsule {
   id: string
   title: string
   text: string
-  recipientEmail: string | null
+  recipientEmail: string
   scheduleDate: string
   status: CapsuleStatus
   sentAt: string | null
   createdAt: string
   files: CapsuleFile[]
 
+  /** Só vem na resposta da criação. No detalhe, a cápsula em grupo é a que traz `participants`. */
   type?: CapsuleType
-  contributionDeadline?: string | null
-  inviteCode?: string | null
+  /** Só vem na resposta da criação de cápsula em grupo. */
+  contributionDeadline?: string
+  /** Só vem para quem criou a cápsula em grupo. */
+  inviteCode?: string
+  /** Presente apenas em cápsulas em grupo. */
   participants?: CapsuleParticipant[]
-  myContribution?: CapsuleContribution | null
+  /** Presente apenas em cápsulas em grupo, em ordem de envio. */
+  contributions?: CapsuleContribution[]
 }
 
 export interface PublicCapsule {
@@ -52,22 +56,34 @@ export interface PublicCapsule {
   text: string
   creatorName: string
   sentAt: string
-  contributions?: PublicContribution[]
   files: CapsuleFile[]
+  /** Presente apenas em cápsulas em grupo, em ordem de envio. */
+  contributions?: CapsuleContribution[]
 }
 
 /** Item da listagem: sem `text` e `files`, com a contagem de anexos. */
-export type CapsuleSummary = Omit<Capsule, 'text' | 'files' | 'inviteCode' | 'myContribution'> & { fileCount: number }
+export type CapsuleSummary = Pick<
+  Capsule,
+  'id' | 'title' | 'recipientEmail' | 'scheduleDate' | 'status' | 'sentAt' | 'createdAt' | 'participants'
+> & { fileCount: number }
 
 export interface CreateCapsuleInput {
   title: string
   text: string
-  recipientEmail?: string
+  recipientEmail: string
   /** ISO 8601 em UTC com sufixo Z. */
   scheduleDate: string
   type?: CapsuleType
   /** ISO 8601 em UTC com sufixo Z. Obrigatório quando `type` é `GROUP`. */
   contributionDeadline?: string
+}
+
+/** PATCH /api/capsules/:id: envie só os campos que mudaram. */
+export type UpdateCapsuleInput = Partial<Pick<CreateCapsuleInput, 'title' | 'text' | 'recipientEmail' | 'scheduleDate'>>
+
+export interface ContributionInput {
+  text?: string
+  images?: File[]
 }
 
 export interface PaginatedResponse<T> {
