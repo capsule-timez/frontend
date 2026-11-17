@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
-  TEXT_MAX_LENGTH,
+  CONTRIBUTION_TEXT_MAX_LENGTH,
   getMinContributionDeadline,
   toDateTimeLocalValue,
+  validateCapsuleEdit,
   validateCapsuleForm,
   validateContributionDeadline,
   validateContributionText,
@@ -83,24 +84,48 @@ describe('getMinContributionDeadline', () => {
 })
 
 describe('validateContributionText', () => {
-  it('accepts a message up to the limit', () => {
-    expect(validateContributionText('Olá, turma')).toBeUndefined()
-    expect(validateContributionText('a'.repeat(TEXT_MAX_LENGTH))).toBeUndefined()
+  it('accepts a message up to the 2,000 characters the API allows', () => {
+    expect(validateContributionText('Olá, turma', 0)).toBeUndefined()
+    expect(validateContributionText('a'.repeat(CONTRIBUTION_TEXT_MAX_LENGTH), 0)).toBeUndefined()
   })
 
-  it.each(['', '   '])('requires a message (%j)', (value) => {
-    expect(validateContributionText(value)).toBe('Escreva sua mensagem.')
+  it.each(['', '   '])('requires a message or an image (%j)', (value) => {
+    expect(validateContributionText(value, 0)).toBe('Escreva uma mensagem ou escolha ao menos uma imagem.')
+    expect(validateContributionText(value, 1)).toBeUndefined()
   })
 
-  it('rejects a message over the limit', () => {
-    expect(validateContributionText('a'.repeat(TEXT_MAX_LENGTH + 1))).toBe(
-      'A mensagem deve ter no máximo 10.000 caracteres.',
+  it('rejects a message over the limit even with images', () => {
+    expect(validateContributionText('a'.repeat(CONTRIBUTION_TEXT_MAX_LENGTH + 1), 2)).toBe(
+      'A mensagem deve ter no máximo 2.000 caracteres.',
     )
   })
 })
 
+describe('validateCapsuleEdit', () => {
+  const values = { title: 'Carta', text: 'Olá', recipientEmail: 'ana@example.com', scheduleDate: schedule }
+
+  it('accepts valid values', () => {
+    expect(validateCapsuleEdit(values, now)).toEqual({})
+  })
+
+  it('applies the same rules as the creation to every field', () => {
+    expect(validateCapsuleEdit({ title: ' ', text: '', recipientEmail: 'x', scheduleDate: local(2020, 1, 1) }, now)).toEqual({
+      title: 'Informe um título.',
+      text: 'Escreva a mensagem da cápsula.',
+      recipientEmail: 'Informe um e-mail válido.',
+      scheduleDate: 'A data de entrega precisa estar no futuro.',
+    })
+  })
+
+  it('requires the recipient, which the API keeps for every capsule', () => {
+    expect(validateCapsuleEdit({ ...values, recipientEmail: '  ' }, now)).toEqual({
+      recipientEmail: 'Informe o e-mail do destinatário.',
+    })
+  })
+})
+
 describe('validateCapsuleForm', () => {
-  it('does not validate the recipient of a group capsule', () => {
+  it('validates the recipient of individual and group capsules, which the API requires for both', () => {
     const values = {
       ...baseValues,
       type: 'GROUP' as const,
@@ -109,10 +134,11 @@ describe('validateCapsuleForm', () => {
       recipientEmail: 'invalido',
     }
 
-    expect(validateCapsuleForm(values, now)).toEqual({})
+    expect(validateCapsuleForm(values, now)).toEqual({ recipientEmail: 'Informe um e-mail válido.' })
     expect(validateCapsuleForm({ ...values, type: 'INDIVIDUAL' }, now)).toEqual({
       recipientEmail: 'Informe um e-mail válido.',
     })
+    expect(validateCapsuleForm({ ...values, recipientEmail: 'turma@example.com' }, now)).toEqual({})
   })
 
   it('ignores the deadline of an individual capsule', () => {
