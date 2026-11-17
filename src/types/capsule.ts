@@ -7,6 +7,8 @@ export type CapsuleMemberRole = 'OWNER' | 'MEMBER'
 export interface CapsuleParticipant {
   name: string
   role: CapsuleMemberRole
+  /** Só vem no detalhe. */
+  hasContributed?: boolean
 }
 
 export interface CapsuleFile {
@@ -39,9 +41,9 @@ export interface Capsule {
   createdAt: string
   files: CapsuleFile[]
 
-  /** Só vem na resposta da criação. No detalhe, a cápsula em grupo é a que traz `participants`. */
+  /** Versões anteriores da API não enviavam no detalhe; aí a cápsula em grupo é a que traz `participants`. */
   type?: CapsuleType
-  /** Só vem na resposta da criação de cápsula em grupo. */
+  /** Presente apenas em cápsulas em grupo. */
   contributionDeadline?: string
   /** Só vem para quem criou a cápsula em grupo. */
   inviteCode?: string
@@ -65,6 +67,7 @@ export interface PublicCapsule {
 export type CapsuleSummary = Pick<
   Capsule,
   'id' | 'title' | 'recipientEmail' | 'scheduleDate' | 'status' | 'sentAt' | 'createdAt' | 'participants'
+  | 'type' | 'contributionDeadline'
 > & { fileCount: number }
 
 export interface CreateCapsuleInput {
