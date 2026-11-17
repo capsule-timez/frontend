@@ -2,6 +2,7 @@ import type { CapsuleType } from '../types/capsule'
 
 export const TITLE_MAX_LENGTH = 120
 export const TEXT_MAX_LENGTH = 10_000
+export const CONTRIBUTION_TEXT_MAX_LENGTH = 2_000
 export const EMAIL_MAX_LENGTH = 254
 export const MIN_SCHEDULE_LEAD_MS = 2 * 60_000
 
@@ -86,32 +87,63 @@ export function validateContributionDeadline(
   return undefined
 }
 
-export function validateContributionText(value: string): string | undefined {
+/** Texto e imagens são opcionais, mas a contribuição precisa de ao menos um dos dois. */
+export function validateContributionText(value: string, imageCount: number): string | undefined {
   const text = value.trim()
 
-  if (!text) return 'Escreva sua mensagem.'
-  if (text.length > TEXT_MAX_LENGTH) return 'A mensagem deve ter no máximo 10.000 caracteres.'
+  if (!text && imageCount === 0) return 'Escreva uma mensagem ou escolha ao menos uma imagem.'
+  if (text.length > CONTRIBUTION_TEXT_MAX_LENGTH) {
+    return `A mensagem deve ter no máximo ${CONTRIBUTION_TEXT_MAX_LENGTH.toLocaleString('pt-BR')} caracteres.`
+  }
 
   return undefined
+}
+
+function validateTitle(value: string): string | undefined {
+  const title = value.trim()
+  if (!title) return 'Informe um título.'
+  if (title.length > TITLE_MAX_LENGTH) return `O título deve ter no máximo ${TITLE_MAX_LENGTH} caracteres.`
+  return undefined
+}
+
+function validateText(value: string): string | undefined {
+  const text = value.trim()
+  if (!text) return 'Escreva a mensagem da cápsula.'
+  if (text.length > TEXT_MAX_LENGTH) return 'A mensagem deve ter no máximo 10.000 caracteres.'
+  return undefined
+}
+
+function validateRecipientEmail(value: string): string | undefined {
+  const email = value.trim()
+  if (!email) return 'Informe o e-mail do destinatário.'
+  if (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email)) return 'Informe um e-mail válido.'
+  return undefined
+}
+
+function withoutEmpty(errors: CapsuleFormErrors): CapsuleFormErrors {
+  return Object.fromEntries(Object.entries(errors).filter(([, message]) => message)) as CapsuleFormErrors
+}
+
+export type CapsuleEditValues = Pick<CapsuleFormValues, 'title' | 'text' | 'recipientEmail' | 'scheduleDate'>
+
+/** Regras do PATCH /api/capsules/:id, que aceita os mesmos campos de conteúdo da criação. */
+export function validateCapsuleEdit(values: CapsuleEditValues, now = new Date()): CapsuleFormErrors {
+  return withoutEmpty({
+    title: validateTitle(values.title),
+    text: validateText(values.text),
+    recipientEmail: validateRecipientEmail(values.recipientEmail),
+    scheduleDate: validateScheduleDate(values.scheduleDate, now),
+  })
 }
 
 export function validateCapsuleForm(
   values: CapsuleFormValues,
   now = new Date(),
 ): CapsuleFormErrors {
-  const errors: CapsuleFormErrors = {}
-  const title = values.title.trim()
-  const text = values.text.trim()
-
-  if (!title) errors.title = 'Informe um título.'
-  else if (title.length > TITLE_MAX_LENGTH) {
-    errors.title = `O título deve ter no máximo ${TITLE_MAX_LENGTH} caracteres.`
-  }
-
-  if (!text) errors.text = 'Escreva a mensagem da cápsula.'
-  else if (text.length > TEXT_MAX_LENGTH) {
-    errors.text = 'A mensagem deve ter no máximo 10.000 caracteres.'
-  }
+  const errors: CapsuleFormErrors = withoutEmpty({
+    title: validateTitle(values.title),
+    text: validateText(values.text),
+  })
 
   const scheduleError = validateScheduleDate(values.scheduleDate, now)
   if (scheduleError) errors.scheduleDate = scheduleError
@@ -125,12 +157,9 @@ export function validateCapsuleForm(
     if (deadlineError) errors.contributionDeadline = deadlineError
   }
 
-  if (values.type !== 'GROUP' && values.recipientMode === 'other') {
-    const email = values.recipientEmail.trim()
-    if (!email) errors.recipientEmail = 'Informe o e-mail do destinatário.'
-    else if (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email)) {
-      errors.recipientEmail = 'Informe um e-mail válido.'
-    }
+  if (values.recipientMode === 'other') {
+    const emailError = validateRecipientEmail(values.recipientEmail)
+    if (emailError) errors.recipientEmail = emailError
   }
 
   return errors
