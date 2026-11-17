@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom'
 import { Button } from '../components/Button/Button'
 import { Card } from '../components/Card/Card'
 import { CapsuleImage } from '../components/CapsuleImage/CapsuleImage'
+import { ContributionList } from '../components/ContributionList/ContributionList'
 import { EmptyState } from '../components/EmptyState/EmptyState'
 import { Icon } from '../components/Icon/Icon'
 import { getApiErrorDetails, getPublicCapsule } from '../services/capsuleService'
@@ -87,19 +88,10 @@ function CapsuleContent({ capsule }: { capsule: PublicCapsule }) {
           <div><dt>Entregue em</dt><dd><time dateTime={capsule.sentAt}>{formatDateTime(capsule.sentAt)}</time></dd></div>
         </dl>
       </header>
-      {capsule.contributions?.map((contribution) => (
-        <Card key={contribution.id} className="capsula-publica__content">
-          <h2>{contribution.authorName}</h2>
-          <p className="capsula-publica__message">{contribution.text}</p>
-          {contribution.file && <CapsuleImage key={contribution.file.downloadUrl} file={contribution.file} />}
-        </Card>
-      ))}
-      {!capsule.contributions?.length && (
-        <Card className="capsula-publica__content">
-          <h2>Mensagem</h2>
-          <p className="capsula-publica__message">{capsule.text}</p>
-        </Card>
-      )}
+      <Card className="capsula-publica__content">
+        <h2>Mensagem</h2>
+        <p className="capsula-publica__message">{capsule.text}</p>
+      </Card>
       {images.length > 0 && (
         <Card className="capsula-publica__content">
           <h2>Imagens</h2>
@@ -110,6 +102,12 @@ function CapsuleContent({ capsule }: { capsule: PublicCapsule }) {
               </li>
             ))}
           </ul>
+        </Card>
+      )}
+      {!!capsule.contributions?.length && (
+        <Card className="capsula-publica__content">
+          <h2>Contribuições</h2>
+          <ContributionList contributions={capsule.contributions} />
         </Card>
       )}
       {others.length > 0 && (
