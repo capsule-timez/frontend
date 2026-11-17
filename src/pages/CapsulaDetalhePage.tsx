@@ -182,6 +182,7 @@ function CapsulaDetalhe({ id }: { id: string }) {
                     <li key={`${participant.role}-${index}`}>
                       {participant.name}
                       {participant.role === 'OWNER' && <Badge tone="warning">Criador</Badge>}
+                      {participant.hasContributed && <Badge tone="success" icon="check">Contribuiu</Badge>}
                     </li>
                   ))}
                 </ul>
