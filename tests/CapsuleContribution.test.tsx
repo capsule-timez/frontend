@@ -184,6 +184,19 @@ describe('group capsule contribution', () => {
       expect(screen.getByText(/até 3 imagens/)).toBeInTheDocument()
     })
 
+    it('hides the form when the deadline sent by the API has passed', async () => {
+      await renderDetail(capsule({ type: 'GROUP', contributionDeadline: new Date(Date.now() - DAY).toISOString() }))
+
+      expect(screen.queryByLabelText('Sua mensagem (opcional com imagens)')).not.toBeInTheDocument()
+      expect(screen.getByText('O prazo para contribuições desta cápsula terminou.')).toBeInTheDocument()
+    })
+
+    it('keeps the form while the deadline sent by the API is open', async () => {
+      await renderDetail(capsule({ type: 'GROUP', contributionDeadline: new Date(Date.now() + DAY).toISOString() }))
+
+      expect(messageField()).toBeInTheDocument()
+    })
+
     it.each(['SENT', 'FAILED'] as const)('hides the form when the capsule is %s', async (status) => {
       await renderDetail(capsule({ status }))
 
