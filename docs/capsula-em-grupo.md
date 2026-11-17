@@ -31,13 +31,15 @@ A cápsula individual vai sem `type` e sem `contributionDeadline`. Na resposta d
 
 ### `GET /api/capsules` e `GET /api/capsules/{id}`
 
-O detalhe e a listagem **não** trazem `type` nem `contributionDeadline`. A cápsula em grupo é a que traz `participants`:
+O detalhe e a listagem trazem `type`, e a cápsula em grupo traz também `contributionDeadline` e `participants`. No detalhe, cada participante vem com `hasContributed`:
 
 ```json
 {
+  "type": "GROUP",
+  "contributionDeadline": "2026-12-01T12:00:00.000Z",
   "participants": [
-    { "name": "Ana Lima", "role": "OWNER" },
-    { "name": "Bruno Reis", "role": "MEMBER" }
+    { "name": "Ana Lima", "role": "OWNER", "hasContributed": false },
+    { "name": "Bruno Reis", "role": "MEMBER", "hasContributed": true }
   ],
   "contributions": [
     {
@@ -52,7 +54,7 @@ O detalhe e a listagem **não** trazem `type` nem `contributionDeadline`. A cáp
 }
 ```
 
-`contributions` só vem no detalhe, e `inviteCode` só vem para o `OWNER`. Por isso a Web considera dono da cápsula quem recebe o `inviteCode` (`src/utils/capsuleGroup.ts`).
+`contributions` só vem no detalhe, e `inviteCode` só vem para o `OWNER`. Por isso a Web considera dono da cápsula quem recebe o `inviteCode` (`src/utils/capsuleGroup.ts`). Para continuar funcionando com versões da API sem `type` no detalhe, a Web também reconhece a cápsula em grupo pela presença de `participants`.
 
 ### `POST /api/capsules/join`
 
@@ -66,10 +68,11 @@ Só texto vai em JSON (`{ "text": "…" }`). Com imagens, a Web manda `multipart
 
 Traz `title`, `text`, `creatorName`, `sentAt` e os `files` da cápsula, mais `contributions` (no mesmo formato do detalhe) quando ela é em grupo.
 
-## Limitações atuais do backend
+## Prazo e participação no detalhe
 
-- O detalhe não informa o prazo. A Web mostra o formulário de contribuição e o de convites enquanto a cápsula está `SCHEDULED` e os fecha quando a API responde `409 CONTRIBUTION_DEADLINE_PASSED`. Se o backend passar a enviar `contributionDeadline` no detalhe, a Web já usa esse valor para exibir o prazo e fechar os formulários.
-- Os participantes vêm só com nome e papel, sem identificador. A lista de participantes não indica quem já contribuiu.
+- O detalhe mostra o prazo para contribuições e fecha os formulários de contribuição e de convites quando ele passa. Se a API responder `409 CONTRIBUTION_DEADLINE_PASSED` antes disso (por exemplo, com a página aberta há muito tempo), os formulários também fecham.
+- A lista de participantes marca com **Contribuiu** quem já enviou ao menos uma contribuição.
+- Esses campos vêm da branch `fix/group-capsule-detail-fields` do backend. Sem eles, a Web esconde o prazo e o selo e depende só do `409`.
 
 ## Validação
 
