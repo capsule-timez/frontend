@@ -291,63 +291,51 @@ describe('NovaCapsulaPage: group capsule option', () => {
       })
     }
 
-    it('replaces the recipient choice with delivery to all participants', () => {
+    it('keeps the recipient choice, since the API delivers a group capsule to one e-mail', () => {
       renderPage()
-
-      expect(screen.getByRole('radio', { name: /Para mim/ })).toBeInTheDocument()
 
       chooseGroup()
 
-      expect(screen.queryByRole('radio', { name: /Para mim/ })).not.toBeInTheDocument()
-      expect(screen.queryByRole('radio', { name: /Para outra pessoa/ })).not.toBeInTheDocument()
-      expect(screen.getByText('todos os participantes')).toBeInTheDocument()
+      expect(screen.getByRole('radio', { name: /Para mim/ })).toBeChecked()
+      expect(screen.getByText(/com todas as contribuições/)).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('radio', { name: /Para outra pessoa/ }))
+      expect(screen.getByText('Na data de entrega, a cápsula chega neste e-mail com todas as contribuições.')).toBeInTheDocument()
     })
 
-    it('ignores an invalid e-mail typed before switching to group', async () => {
-      createCapsuleMock.mockResolvedValue(group())
+    it('validates the recipient of a group capsule without calling the API', async () => {
       renderPage()
 
+      fillCommonFields()
+      chooseGroup()
+      change('Prazo para contribuições', daysFromNow(10))
       fireEvent.click(screen.getByRole('radio', { name: /Para outra pessoa/ }))
       change('E-mail do destinatário', 'invalido')
-      await createGroup()
+      submit()
 
-      expect(createCapsuleMock.mock.calls[0][0]).not.toHaveProperty('recipientEmail')
+      expect(await screen.findByText('Informe um e-mail válido.')).toBeInTheDocument()
+      expect(createCapsuleMock).not.toHaveBeenCalled()
     })
 
-    it('allows only 1 image', () => {
+    it.each(['INDIVIDUAL', 'GROUP'])('allows up to 5 images on a %s capsule', (type) => {
       renderPage()
 
-      chooseGroup()
-      pickImages('um.png', 'dois.png')
+      if (type === 'GROUP') chooseGroup()
+      pickImages('um.png', 'dois.png', 'tres.png', 'quatro.png', 'cinco.png', 'seis.png')
 
-      expect(screen.getByRole('img', { name: 'Miniatura de um.png' })).toBeInTheDocument()
-      expect(screen.queryByRole('img', { name: 'Miniatura de dois.png' })).not.toBeInTheDocument()
-      expect(screen.getByText(/“dois.png” não foi adicionada: o limite é de 1 imagem\./)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Escolher imagens' })).toBeDisabled()
+      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(5)
+      expect(screen.getByText(/“seis.png” não foi adicionada: o limite é de 5 imagens./)).toBeInTheDocument()
     })
 
-    it('keeps only the first image when switching to group, and warns about it', () => {
+    it('keeps the images when switching to group', () => {
       renderPage()
 
       pickImages('um.png', 'dois.png', 'tres.png')
-      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(3)
-
       chooseGroup()
 
-      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(1)
-      expect(screen.getByRole('img', { name: 'Miniatura de um.png' })).toBeInTheDocument()
-      expect(screen.getByText('Em grupo, cada pessoa anexa 1 imagem')).toBeInTheDocument()
+      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(3)
     })
 
-    it('keeps up to 5 images on an individual capsule', () => {
-      renderPage()
-
-      pickImages('um.png', 'dois.png', 'tres.png', 'quatro.png', 'cinco.png')
-
-      expect(screen.getAllByRole('img', { name: /Miniatura/ })).toHaveLength(5)
-    })
-
-    it('sends type and contributionDeadline in UTC, without a recipient', async () => {
+    it('sends type, contributionDeadline in UTC and the logged user as recipient', async () => {
       createCapsuleMock.mockResolvedValue(group())
       renderPage()
       const scheduleDate = daysFromNow(30)
@@ -362,11 +350,23 @@ describe('NovaCapsulaPage: group capsule option', () => {
       expect(createCapsuleMock.mock.calls[0][0]).toStrictEqual({
         title: 'Formatura',
         text: 'Mensagem',
+        recipientEmail: user.email,
         scheduleDate: new Date(scheduleDate).toISOString(),
         type: 'GROUP',
         contributionDeadline: new Date(deadline).toISOString(),
       })
       expect(createCapsuleMock.mock.calls[0][0].contributionDeadline).toMatch(/Z$/)
+    })
+
+    it('sends another recipient chosen for the group', async () => {
+      createCapsuleMock.mockResolvedValue(group())
+      renderPage()
+
+      fireEvent.click(screen.getByRole('radio', { name: /Para outra pessoa/ }))
+      change('E-mail do destinatário', ' turma@example.com ')
+      await createGroup()
+
+      expect(createCapsuleMock.mock.calls[0][0]).toMatchObject({ type: 'GROUP', recipientEmail: 'turma@example.com' })
     })
 
     it('shows the invite code at the end, with links to continue', async () => {
@@ -435,7 +435,7 @@ describe('NovaCapsulaPage: group capsule option', () => {
     })
 
     it('falls back to the list if the API does not return a code', async () => {
-      createCapsuleMock.mockResolvedValue(createdCapsule({ type: 'GROUP', inviteCode: null }))
+      createCapsuleMock.mockResolvedValue(createdCapsule({ type: 'GROUP', inviteCode: undefined }))
       renderPage()
 
       fillCommonFields()
