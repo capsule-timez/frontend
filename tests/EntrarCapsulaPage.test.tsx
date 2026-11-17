@@ -31,13 +31,12 @@ const capsule: Capsule = {
   sentAt: null,
   createdAt: '2026-01-01T12:00:00.000Z',
   files: [],
-  type: 'GROUP',
-  contributionDeadline: '2029-12-01T12:00:00.000Z',
-  inviteCode: null,
+  // POST /api/capsules/join devolve o detalhe, igual ao GET /api/capsules/:id de um MEMBER.
   participants: [
-    { id: 'user-1', name: 'Ana Lima', isCreator: true },
-    { id: 'user-2', name: 'Bruno Reis', isCreator: false },
+    { name: 'Ana Lima', role: 'OWNER' },
+    { name: 'Bruno Reis', role: 'MEMBER' },
   ],
+  contributions: [],
 }
 
 function page(data: CapsuleSummary[]): PaginatedResponse<CapsuleSummary> {
@@ -45,11 +44,8 @@ function page(data: CapsuleSummary[]): PaginatedResponse<CapsuleSummary> {
 }
 
 function summary(): CapsuleSummary {
-  const item: CapsuleSummary & Partial<Capsule> = { ...capsule, fileCount: 0 }
-  delete item.text
-  delete item.files
-  delete item.inviteCode
-  return item
+  const { id, title, recipientEmail, scheduleDate, status, sentAt, createdAt, participants } = capsule
+  return { id, title, recipientEmail, scheduleDate, status, sentAt, createdAt, participants, fileCount: 0 }
 }
 
 function apiError(status: number, code: string, message: string, details?: unknown) {
