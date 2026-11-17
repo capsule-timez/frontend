@@ -5,6 +5,7 @@ import { Badge } from '../components/Badge/Badge'
 import { Button, ButtonLink } from '../components/Button/Button'
 import { Card } from '../components/Card/Card'
 import { CapsuleContribution } from '../components/CapsuleContribution/CapsuleContribution'
+import { CapsuleEditForm } from '../components/CapsuleEditForm/CapsuleEditForm'
 import { CapsuleInvites } from '../components/CapsuleInvites/CapsuleInvites'
 import { CapsuleStatusBadge } from '../components/CapsuleStatusBadge/CapsuleStatusBadge'
 import { ConfirmDialog } from '../components/ConfirmDialog/ConfirmDialog'
@@ -12,12 +13,11 @@ import { EmptyState } from '../components/EmptyState/EmptyState'
 import { ImagePicker } from '../components/ImagePicker/ImagePicker'
 import { InviteCode } from '../components/InviteCode/InviteCode'
 import { PageHeader } from '../components/PageHeader/PageHeader'
-import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { useImageSelection } from '../hooks/useImageSelection'
 import { deleteCapsule, getApiErrorDetails, getCapsule } from '../services/capsuleService'
 import type { Capsule } from '../types/capsule'
-import { isCapsuleCreator, isGroupCapsule } from '../utils/capsuleGroup'
+import { isGroupCapsule, isGroupOwner } from '../utils/capsuleGroup'
 import { formatDateTime } from '../utils/formatDate'
 import { MAX_IMAGES_PER_CAPSULE } from '../utils/imageValidation'
 import './CapsulaDetalhePage.css'
@@ -39,11 +39,13 @@ function CapsulaDetalhe({ id }: { id: string }) {
   const [attempt, setAttempt] = useState(0)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [editing, setEditing] = useState(false)
   const navigate = useNavigate()
   const toast = useToast()
-  const { user } = useAuth()
   const isGroup = state.status === 'success' && isGroupCapsule(state.capsule)
-  const isGroupCreator = isGroup && isCapsuleCreator(state.capsule, user?.id)
+  const isOwner = state.status === 'success' && isGroupOwner(state.capsule)
+  // Na cápsula individual, quem vê o detalhe é sempre quem a criou.
+  const canManage = !isGroup || isOwner
   const attachedCount = state.status === 'success' ? state.capsule.files.length : 0
   // As imagens já anexadas ocupam vagas do limite por cápsula.
   const images = useImageSelection(MAX_IMAGES_PER_CAPSULE - attachedCount)
@@ -51,6 +53,22 @@ function CapsulaDetalhe({ id }: { id: string }) {
   async function refreshCapsule() {
     const capsule = await getCapsule(id)
     setState({ status: 'success', capsule })
+  }
+
+  async function handleEditDone(notEditable?: boolean) {
+    setEditing(false)
+    if (notEditable) {
+      setState({ status: 'loading' })
+      setAttempt((value) => value + 1)
+      return
+    }
+    try {
+      await refreshCapsule()
+    } catch (error) {
+      toast.error('Alterações salvas, mas não foi possível atualizar a cápsula', {
+        description: getApiErrorDetails(error).message,
+      })
+    }
   }
 
   async function handleUpload() {
@@ -131,27 +149,25 @@ function CapsulaDetalhe({ id }: { id: string }) {
       {state.status === 'success' && (
         <>
           <PageHeader title={state.capsule.title} />
-          <Card className="capsula-detalhe__content">
-            <dl className="capsula-detalhe__meta">
-              {isGroup
-                ? <div><dt>Destinatários</dt><dd>Todos os participantes</dd></div>
-                : <div><dt>Destinatário</dt><dd>{state.capsule.recipientEmail}</dd></div>}
-              <div><dt>Data de entrega</dt><dd><time dateTime={state.capsule.scheduleDate}>{formatDateTime(state.capsule.scheduleDate)}</time></dd></div>
-              <div><dt>Status</dt><dd><CapsuleStatusBadge status={state.capsule.status} /></dd></div>
-              {isGroup && <div><dt>Tipo</dt><dd><Badge tone="info" icon="users">Grupo</Badge></dd></div>}
-              {isGroup && state.capsule.contributionDeadline && (
-                <div><dt>Prazo para contribuições</dt><dd><time dateTime={state.capsule.contributionDeadline}>{formatDateTime(state.capsule.contributionDeadline)}</time></dd></div>
-              )}
-            </dl>
-            {!isGroup && (
-              <>
-                <h2>Mensagem</h2>
-                <p className="capsula-detalhe__message">{state.capsule.text}</p>
-              </>
-            )}
-          </Card>
-          {isGroupCreator && <CapsuleInvites capsule={state.capsule} />}
-          {isGroupCreator && state.capsule.inviteCode && (
+          {editing ? (
+            <CapsuleEditForm capsule={state.capsule} onCancel={() => setEditing(false)} onDone={handleEditDone} />
+          ) : (
+            <Card className="capsula-detalhe__content">
+              <dl className="capsula-detalhe__meta">
+                <div><dt>Destinatário</dt><dd>{state.capsule.recipientEmail}</dd></div>
+                <div><dt>Data de entrega</dt><dd><time dateTime={state.capsule.scheduleDate}>{formatDateTime(state.capsule.scheduleDate)}</time></dd></div>
+                <div><dt>Status</dt><dd><CapsuleStatusBadge status={state.capsule.status} /></dd></div>
+                {isGroup && <div><dt>Tipo</dt><dd><Badge tone="info" icon="users">Grupo</Badge></dd></div>}
+                {isGroup && state.capsule.contributionDeadline && (
+                  <div><dt>Prazo para contribuições</dt><dd><time dateTime={state.capsule.contributionDeadline}>{formatDateTime(state.capsule.contributionDeadline)}</time></dd></div>
+                )}
+              </dl>
+              <h2>Mensagem</h2>
+              <p className="capsula-detalhe__message">{state.capsule.text}</p>
+            </Card>
+          )}
+          {isOwner && <CapsuleInvites capsule={state.capsule} />}
+          {isOwner && state.capsule.inviteCode && (
             <Card className="capsula-detalhe__content">
               <h2>Convide participantes</h2>
               <InviteCode code={state.capsule.inviteCode} />
@@ -162,11 +178,10 @@ function CapsulaDetalhe({ id }: { id: string }) {
               <h2>Participantes</h2>
               {!state.capsule.participants?.length ? <p>Nenhum participante nesta cápsula.</p> : (
                 <ul className="capsula-detalhe__participants">
-                  {state.capsule.participants.map((participant) => (
-                    <li key={participant.id}>
+                  {state.capsule.participants.map((participant, index) => (
+                    <li key={`${participant.role}-${index}`}>
                       {participant.name}
-                      {participant.isCreator && <Badge tone="warning">Criador</Badge>}
-                      {participant.hasContributed && <Badge tone="success" icon="check">Contribuiu</Badge>}
+                      {participant.role === 'OWNER' && <Badge tone="warning">Criador</Badge>}
                     </li>
                   ))}
                 </ul>
@@ -174,7 +189,7 @@ function CapsulaDetalhe({ id }: { id: string }) {
             </Card>
           )}
           {isGroup && <CapsuleContribution capsule={state.capsule} onContributed={refreshCapsule} />}
-          {!isGroup && (
+          {(canManage || state.capsule.files.length > 0) && (
             <Card className="capsula-detalhe__content">
               <h2>Anexos</h2>
               {state.capsule.files.length === 0 ? <p>Nenhum anexo nesta cápsula.</p> : (
@@ -199,7 +214,7 @@ function CapsulaDetalhe({ id }: { id: string }) {
               )}
             </Card>
           )}
-          {!isGroup && state.capsule.status === 'SCHEDULED' && attachedCount < MAX_IMAGES_PER_CAPSULE && (
+          {canManage && state.capsule.status === 'SCHEDULED' && attachedCount < MAX_IMAGES_PER_CAPSULE && (
             <Card className="capsula-detalhe__content">
               <h2>Adicionar imagens</h2>
               <ImagePicker
@@ -219,8 +234,11 @@ function CapsulaDetalhe({ id }: { id: string }) {
               )}
             </Card>
           )}
-          {state.capsule.status === 'SCHEDULED' && (!isGroup || isGroupCreator) && (
+          {state.capsule.status === 'SCHEDULED' && canManage && !editing && (
             <div className="capsula-detalhe__actions">
+              <Button variant="secondary" onClick={() => setEditing(true)}>
+                Editar cápsula
+              </Button>
               <Button variant="danger" icon="trash" onClick={() => setConfirmingDelete(true)}>
                 Excluir cápsula
               </Button>
