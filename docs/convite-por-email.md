@@ -2,7 +2,7 @@
 
 No detalhe de uma cápsula em grupo, quem a criou pode informar um ou mais e-mails e enviar convites. Logo abaixo do formulário fica a lista dos convites já enviados, com o e-mail, a data de envio e o status de cada um. Quem recebe o e-mail abre o link `/convite/:token`, entra na cápsula e vai direto para o detalhe dela. Sem login, a pessoa entra ou cria uma conta e depois volta ao convite.
 
-A Web segue o contrato da branch `feature/ctz-76-implementar-convite-por-e-mail-para-capsula` do backend (`src/services/invite.service.ts`). Enquanto essa branch não for mesclada, as três rotas abaixo respondem `404` no `main` do backend.
+A Web segue o contrato do backend em `src/services/invite.service.ts`, vindo da branch `feature/ctz-76-implementar-convite-por-e-mail-para-capsula`, já mesclada no `main`.
 
 ## Regras da API
 
